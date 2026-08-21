@@ -1,48 +1,89 @@
 # apikey-vault 🔐
 
-本地加密的 **API 密钥保险箱**，专为 AI Agent（Codex / Claude 等）设计。
+本地加密的 **API 密钥保险箱**，带图形界面，专为 AI Agent（Codex / Claude 等）与多设备使用设计。
 
 把密钥明文写在 `.env` 或 shell profile 里很危险：可能被误提交进 Git、被 Agent 带进对话
 上下文、散落各处难以轮换。`apikey-vault` 把所有密钥用 **AES-256-GCM** 加密后存在本地
-SQLite 中，人类用 CLI 管理，Agent 用 CLI 或本地 HTTP API 按需获取。
+SQLite 中：人类用**图形界面或 CLI** 管理，Agent 用 CLI 或本地 HTTP API 按需获取。
 
 ## ✨ 特性
 
+- **图形界面（GUI）**：浏览器单页应用，锁定/解锁门禁、密钥库列表、密钥输入/编辑、一键复制、
+  显示/隐藏、重命名、删除、改密、导出/导入、首启初始化。
 - **加密存储**：AES-256-GCM 认证加密 + scrypt 密钥派生；主密码永不落盘；磁盘上无明文。
-- **人类 CLI**：`store` / `get` / `list` / `delete` / `rename` / `export-env` / `change-password`。
-- **Agent HTTP API**：`apivault serve` 启动本地 REST 服务，Bearer Token 鉴权，默认只监听
-  `127.0.0.1`。
+- **人类 CLI**：`store` / `get` / `list` / `delete` / `rename` / `export-env` / `change-password` / `export` / `import`。
+- **Agent HTTP API**：`apivault serve` 启动本地 REST 服务，Bearer Token 鉴权，默认只监听 `127.0.0.1`。
+- **多端可用**：`--host 0.0.0.0` 后同一局域网内手机/电脑浏览器直接访问 GUI；加密 vault 文件可
+  导出/导入到任意设备（密文传输，安全）。
+- **独立端**：`apivault serve --open` 一键打开 GUI；`scripts/build_app.sh` 可打包为 macOS
+  独立 `.app`（内嵌 Python 环境，无需预装依赖）。
 - **安全细节**：每条密钥独立 nonce；会话 Token 内存中只存 SHA-256 摘要并带 TTL；
-  `/v1/unlock` 失败限速；响应 `Cache-Control: no-store`；vault 文件权限 0600。
-- **极简依赖**：仅依赖 `cryptography`，HTTP 服务用 Python 标准库。
+  `/v1/unlock` 失败限速；响应 `Cache-Control: no-store` + CSP；vault 文件权限 0600。
+- **极简依赖**：运行时仅依赖 `cryptography`，HTTP 服务与 GUI 用 Python 标准库 + 原生 JS。
+
+## 📸 界面预览
+
+![锁定界面](docs/screenshot-locked.png)
+![密钥库](docs/screenshot-unlocked.png)
+![密钥详情](docs/screenshot-detail.png)
 
 ## 📦 安装
 
 ```bash
 pip install -e ".[dev]"     # 开发安装（含测试依赖）
-# 或仅运行依赖
-pip install -e .
 ```
 
 需要 Python 3.10+。
 
-## 🚀 快速开始（人类）
+## 🖥️ 图形界面（推荐）
 
 ```bash
-# 1. 初始化保险库（会要求设置主密码；之后每个命令都要用它解锁）
+apivault serve --open        # 启动并自动打开浏览器 http://127.0.0.1:8417
+```
+
+- **首次使用**：界面会引导你创建保险库（设置主密码）。
+- 之后每次打开：输入主密码解锁 → 增删改查密钥库。
+- 底部栏可**锁定 / 改密 / 导出加密 vault / 导入加密 vault**。
+
+### 多端访问（局域网）
+
+```bash
+apivault serve --host 0.0.0.0 --port 8417 --token <你的agent令牌>
+```
+
+手机或其它电脑用浏览器访问 `http://<本机IP>:8417`，在「Use a bearer token instead」
+输入令牌即可连接（保险库解锁后可用）。注意：`--host 0.0.0.0` 会把服务暴露到局域网，
+务必使用强令牌，且仅限可信网络。
+
+### 独立 App（macOS）
+
+```bash
+./scripts/build_app.sh        # 生成 dist/apikey-vault.app（内嵌 Python，无需预装依赖）
+open dist/apikey-vault.app    # 双击即启动，自动打开浏览器
+```
+
+日志在 `~/.apikey-vault/app.log`。
+
+## 🚀 快速开始（CLI）
+
+```bash
+# 1. 初始化保险库
 apivault init
 
 # 2. 保存密钥（交互输入、--value、或 --stdin）
 apivault store OPENAI_API_KEY
 apivault store OPENAI_API_KEY --value sk-...
-printf 'sk-...' | apivault store ANTHROPIC_API_KEY --stdin
 
 # 3. 读取 / 列出 / 导出
 apivault get OPENAI_API_KEY          # 仅 stdout 输出值，便于脚本/Agent 捕获
 apivault list                        # 只显示元数据，绝不显示值
 apivault export-env                  # 输出 export OPENAI_API_KEY='...' 行
 
-# 4. 其他
+# 4. 跨设备迁移（加密文件，安全）
+apivault export ~/vault-backup.db    # 导出
+apivault import ~/vault-backup.db    # 在另一台设备导入（需 --yes 确认）
+
+# 5. 其他
 apivault info OPENAI_API_KEY
 apivault rename OPENAI_API_KEY OPENAI_KEY
 apivault delete OPENAI_API_KEY --yes
@@ -56,9 +97,6 @@ apivault status
 2. `--password-stdin`
 3. 环境变量 `APIVAULT_PASSWORD`
 4. 交互式 `getpass` 输入
-
-> 注：用环境变量最方便，但进程环境可能被同机进程读取；对高价值密钥建议用
-> `--password-file`。
 
 ## 🤖 给 AI Agent 用（三种方式）
 
@@ -116,13 +154,16 @@ curl -s http://127.0.0.1:8417/v1/keys/OPENAI_API_KEY \
 python -m pytest
 ```
 
-覆盖密码学往返/篡改、存储 CRUD/改密、CLI 端到端、HTTP API 全链路（含限速与鉴权）。
+覆盖密码学往返/篡改、存储 CRUD/改密/导出导入、CLI 端到端、HTTP API 全链路
+（含鉴权、限速、静态 GUI、首启初始化）。
 
 ## ⚠️ 注意事项
 
 - 默认只监听 `127.0.0.1`；如需 `--host 0.0.0.0` 供局域网使用，请自行评估风险并确保
   Token 安全。
 - 不要提交真实密钥；本仓库的测试只用假密钥。
+- 跨设备迁移用 `export`/`import` 时，请确保目标设备上没有更新的本地改动（导出/导入是
+  整体替换，不做合并）。
 
 ## 📄 License
 

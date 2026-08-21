@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>apikey-vault</title>
+  <link rel="icon" href="/app/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app/style.css">
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" class="symbols" aria-hidden="true">
+    <symbol id="i-lock" viewBox="0 0 24 24">
+      <rect x="4" y="10" width="16" height="11" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </symbol>
+    <symbol id="i-key" viewBox="0 0 24 24">
+      <circle cx="8" cy="16" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <path d="M11 13 20 4m-3 3 2.5 2.5M14 8l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24">
+      <rect x="9" y="9" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <path d="M5 15V5a1 1 0 0 1 1-1h10" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24">
+      <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24">
+      <path d="M4 4l16 16M10.5 6.2A9.6 9.6 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 4M6.5 7.8A17 17 0 0 0 2 12s3.5 6 10 6a9.6 9.6 0 0 0 3.5-.7" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+      <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m3 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+      <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24">
+      <path d="M12 15V3m0 0 4 4m-4-4L8 7M4 19h16" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="M4 12.5 9 17.5 20 6.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+    </symbol>
+  </svg>
+
+  <div id="app" class="locked">
+    <header class="topbar">
+      <div class="brand">
+        <svg class="brand-mark" aria-hidden="true"><use href="#i-key"/></svg>
+        <span class="brand-name">apikey-vault</span>
+        <span class="version" id="version">v0.1.0</span>
+      </div>
+      <div class="status">
+        <span class="led" id="lock-led"></span>
+        <span id="lock-label" class="lock-label">LOCKED</span>
+        <span class="sep">/</span>
+        <span id="vault-path" class="muted"></span>
+      </div>
+    </header>
+
+    <main>
+      <!-- first-run init screen -->
+      <section id="init-screen" class="screen" hidden>
+        <div class="unlock-box">
+          <div class="unlock-glyph"><svg aria-hidden="true"><use href="#i-key"/></svg></div>
+          <h1>Initialize vault</h1>
+          <p class="muted">No vault found yet. Create one with a master password — every key is encrypted with it and nothing is stored in plain text.</p>
+
+          <form id="init-form" autocomplete="off">
+            <div class="init-fields">
+              <div>
+                <label for="init-password">Master password</label>
+                <input type="password" id="init-password" autocomplete="new-password" spellcheck="false">
+              </div>
+              <div>
+                <label for="init-confirm">Confirm master password</label>
+                <input type="password" id="init-confirm" autocomplete="new-password" spellcheck="false">
+              </div>
+              <button type="submit" class="primary block">Create vault</button>
+            </div>
+          </form>
+
+          <p id="init-error" class="error" hidden></p>
+        </div>
+      </section>
+
+      <!-- lock screen -->
+      <section id="unlock-screen" class="screen">
+        <div class="unlock-box">
+          <div class="unlock-glyph"><svg aria-hidden="true"><use href="#i-lock"/></svg></div>
+          <h1>Vault locked</h1>
+          <p class="muted">Enter the master password to unlock this vault.</p>
+
+          <form id="unlock-form" autocomplete="off">
+            <label for="unlock-password">Master password</label>
+            <div class="field-row">
+              <input type="password" id="unlock-password" autocomplete="current-password" autofocus spellcheck="false">
+              <button type="submit" class="primary">Unlock</button>
+            </div>
+          </form>
+
+          <button type="button" id="token-mode-btn" class="link">Use a bearer token instead</button>
+
+          <form id="token-form" hidden autocomplete="off">
+            <label for="token-input">Bearer token</label>
+            <div class="field-row">
+              <input type="password" id="token-input" autocomplete="off" spellcheck="false">
+              <button type="submit" class="primary">Connect</button>
+            </div>
+            <p class="hint muted">Static token from <code>apivault serve --token</code>, or a token returned by <code>/v1/unlock</code>.</p>
+          </form>
+
+          <p id="unlock-error" class="error" hidden></p>
+        </div>
+      </section>
+
+      <!-- vault screen -->
+      <section id="vault-screen" class="screen" hidden>
+        <div class="layout">
+          <aside class="sidebar">
+            <div class="sidebar-head">
+              <h2>Key library</h2>
+              <span id="key-count" class="count">0</span>
+            </div>
+            <input type="search" id="key-filter" placeholder="Filter keys" autocomplete="off" spellcheck="false">
+            <ul id="key-list"></ul>
+            <button id="add-key-btn" class="primary block">
+              <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+              Add key
+            </button>
+          </aside>
+
+          <section class="detail">
+            <div id="empty-detail" class="empty">
+              <svg class="icon big muted" aria-hidden="true"><use href="#i-key"/></svg>
+              <p id="empty-text">No keys yet — add one.</p>
+            </div>
+
+            <div id="key-detail" hidden>
+              <div class="detail-head">
+                <h2 id="detail-name"></h2>
+                <div class="detail-actions">
+                  <button id="copy-btn"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy</button>
+                  <button id="reveal-btn"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span id="reveal-label">Reveal</span></button>
+                  <button id="rename-btn">Rename</button>
+                  <button id="delete-btn" class="danger"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button>
+                </div>
+              </div>
+
+              <div class="value-box">
+                <code id="detail-value"></code>
+                <button id="reveal-inline" class="ghost" title="Reveal">Reveal</button>
+              </div>
+
+              <dl class="meta">
+                <div><dt>Description</dt><dd id="detail-desc"></dd></div>
+                <div><dt>Created</dt><dd id="detail-created"></dd></div>
+                <div><dt>Updated</dt><dd id="detail-updated"></dd></div>
+              </dl>
+            </div>
+
+            <!-- editor (add / edit / rename) -->
+            <div id="editor" hidden>
+              <h2 id="editor-title">Add key</h2>
+              <form id="editor-form" autocomplete="off">
+                <div class="form-grid">
+                  <label>Name
+                    <input type="text" id="edit-name" placeholder="OPENAI_API_KEY" spellcheck="false" autocomplete="off">
+                  </label>
+                  <label>Description
+                    <input type="text" id="edit-desc" placeholder="OpenAI key" spellcheck="false" autocomplete="off">
+                  </label>
+                  <label class="span2">Value
+                    <input type="password" id="edit-value" placeholder="sk-..." spellcheck="false" autocomplete="new-password">
+                  </label>
+                </div>
+                <div class="editor-actions">
+                  <button type="submit" class="primary" id="editor-save">Save</button>
+                  <button type="button" class="ghost" id="editor-cancel">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span id="status-text" class="status-text">Ready.</span>
+      <span class="spacer"></span>
+      <button id="change-pw-btn" hidden>Change password</button>
+      <button id="export-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Export vault</button>
+      <button id="import-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>Import vault</button>
+      <button id="lock-btn" class="danger" hidden><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Lock</button>
+      <input type="file" id="import-file" accept=".db,application/octet-stream" hidden>
+    </footer>
+  </div>
+
+  <div id="modal-backdrop" hidden>
+    <div id="modal" role="dialog" aria-modal="true">
+      <h2 id="modal-title"></h2>
+      <div id="modal-body"></div>
+      <div id="modal-actions"></div>
+    </div>
+  </div>
+
+  <script src="/app/app.js"></script>
+</body>
+</html>

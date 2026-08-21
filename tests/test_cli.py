@@ -109,3 +109,31 @@ def test_status(tmp_path):
     run(["init"], tmp_path)
     r = run(["status"], tmp_path)
     assert "initialized: yes" in r.stdout
+
+
+def test_export_import_cli(tmp_path):
+    src_dir = tmp_path / "src"
+    dst_dir = tmp_path / "dst"
+    run(["init"], src_dir)
+    run(["store", "MOVE_ME", "--value", "secret-123"], src_dir)
+
+    out_file = tmp_path / "vault-export.db"
+    r = run(["export", str(out_file)], src_dir)
+    assert r.returncode == 0, r.stderr
+    assert out_file.exists()
+    raw = out_file.read_bytes()
+    assert b"secret-123" not in raw  # encrypted
+
+    r = run(["import", str(out_file), "--yes"], dst_dir)
+    assert r.returncode == 0, r.stderr
+    r = run(["get", "MOVE_ME"], dst_dir)
+    assert r.returncode == 0
+    assert r.stdout.strip() == "secret-123"
+
+
+def test_import_rejects_garbage(tmp_path):
+    out_file = tmp_path / "garbage.db"
+    out_file.write_bytes(b"this is not a vault at all")
+    r = run(["import", str(out_file), "--yes"], tmp_path)
+    assert r.returncode == 1
+    assert "not a valid" in r.stderr

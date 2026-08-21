@@ -30,6 +30,9 @@ apivault = "apivault.cli:main"
 [tool.setuptools.packages.find]
 include = ["apivault*"]
 
+[tool.setuptools.package-data]
+apivault = ["web/*.html", "web/*.js", "web/*.css", "web/*.svg"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

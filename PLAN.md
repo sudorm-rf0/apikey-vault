@@ -151,3 +151,53 @@ apikey-vault/
 - 本地 `git init`，提交全部源码与文档（**不含任何真实密钥/测试假密钥的明文**）；
 - 用 `gh repo create` 在 sudorm-rf0 账号下创建仓库并推送（默认 **private**，可随时改 public）；
 - 提供 README 快速开始 + AGENTS.md 让 Agent 开箱即用。
+
+---
+
+## 9. v0.2 更新：图形界面 + 多端 + 独立端
+
+在 v0.1（CLI + HTTP API）基础上新增：
+
+### 9.1 图形界面（GUI）
+
+- 服务端新增静态资源目录 `apivault/web/`（`index.html` / `style.css` / `app.js`），
+  同源提供，无构建步骤、无 CORS。
+- 设计锚点：**Industrial**（暖黑底、等宽字体、1px 边框、语义信号色绿/红/琥珀），
+  契合“安全仪器”的定位；全部图标为内联 SVG（非 Unicode 字符）。
+- 界面流程：
+  - 首启 `Initialize vault` 界面（POST `/v1/init` 创建保险库并自动解锁）；
+  - 锁定门禁 `Vault locked`（主密码 / Bearer Token 两种解锁方式）；
+  - 解锁后：左侧密钥库（过滤、计数）+ 右侧详情（显示/隐藏、复制、重命名、删除）；
+  - 底部状态栏：锁定、改密、导出加密 vault、导入加密 vault。
+- 安全：CSP `default-src 'self'`、`Cache-Control: no-store`、`X-Frame-Options: DENY`、
+  路径穿越防护；密钥值仅在“显示/复制”时按需拉取，不在内存中长期保留。
+
+### 9.2 多端可用
+
+- `--host 0.0.0.0`：局域网内任意设备浏览器访问 GUI（需 Bearer Token）。
+- `export` / `import`（CLI 与 API）：加密 vault 文件整体迁移；因为全是密文，
+  跨设备/跨网络传输安全；目标设备用原主密码解锁。
+- 静态 Token（`--token`）在锁定后保留：`Lock` 只吊销动态会话 Token，静态 Agent
+  Token 在重新解锁后继续可用（锁定期间返回 423）。
+
+### 9.3 独立端
+
+- `apivault serve --open`：启动服务并自动打开默认浏览器。
+- `scripts/build_app.sh`：构建 `dist/apikey-vault.app`（macOS），内嵌 Python
+  virtualenv + 项目安装包，无需全局依赖；双击启动、日志写 `~/.apikey-vault/app.log`。
+
+### 9.4 新增 API
+
+| 端点 | 说明 |
+| --- | --- |
+| POST `/v1/init` | 首启创建保险库（未初始化时） |
+| POST `/v1/password` | 修改主密码（需旧密码） |
+| GET `/v1/export` | 下载加密 vault 文件 |
+| POST `/v1/import` | 上传并整体替换 vault（吊销 Token、重新锁定） |
+
+### 9.5 测试
+
+38 个测试全部通过，覆盖：/v1/init、改密 API、导出/导入（含非法文件拒绝）、
+静态 GUI 服务与路径穿越、静态 Token 跨 Lock 存活、CLI export/import 端到端。
+GUI 通过真实 Chrome（playwright-core）做了端到端验证：首启初始化 → 解锁 →
+增删改查 → 显示/复制 → 改密 → 导出 → 锁定，控制台零报错。

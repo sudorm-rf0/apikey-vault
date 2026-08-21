@@ -98,6 +98,18 @@ def _build_parser() -> argparse.ArgumentParser:
                    help=f"dynamic token lifetime in seconds (default {DEFAULT_TTL_SECONDS})")
     p.add_argument("--no-unlock", action="store_true",
                    help="start locked even if a password is available")
+    p.add_argument("--open", action="store_true",
+                   help="open the GUI in the default browser after startup")
+    _add_password_opts(p)
+
+    # export / import for moving the (encrypted) vault between devices
+    p = sub.add_parser("export", help="export the encrypted vault to a file (safe to move between devices)")
+    p.add_argument("file", help="output file path")
+    _add_password_opts(p)
+
+    p = sub.add_parser("import", help="replace the vault from an exported encrypted file")
+    p.add_argument("file", help="input file path")
+    p.add_argument("--yes", action="store_true", help="skip confirmation")
     _add_password_opts(p)
 
     return parser
@@ -321,12 +333,56 @@ def _cmd_change_password(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_export(args: argparse.Namespace) -> int:
+    try:
+        store = _unlock_store(args)
+        data = store.export_bytes()
+        store.lock()
+    except (VaultError, ValueError) as exc:
+        _eprint(f"error: {exc}")
+        return 1
+    out = Path(args.file).expanduser()
+    try:
+        out.write_bytes(data)
+        os.chmod(out, 0o600)
+    except OSError as exc:
+        _eprint(f"error: cannot write {out}: {exc}")
+        return 1
+    _eprint(f"exported encrypted vault ({len(data)} bytes) to {out}")
+    _eprint("import it on another device with `apivault import <file>`")
+    return 0
+
+
+def _cmd_import(args: argparse.Namespace) -> int:
+    inp = Path(args.file).expanduser()
+    if not inp.is_file():
+        _eprint(f"error: {inp} does not exist")
+        return 1
+    if not args.yes:
+        try:
+            answer = input(
+                f"replace the current vault with {inp}? [y/N] "
+            ).strip().lower()
+        except EOFError:
+            answer = "n"
+        if answer not in ("y", "yes"):
+            _eprint("aborted")
+            return 1
+    try:
+        store = VaultStore(args.dir)
+        store.import_bytes(inp.read_bytes())
+    except (VaultError, ValueError) as exc:
+        _eprint(f"error: {exc}")
+        return 1
+    _eprint(f"imported {inp}; the vault is now locked — unlock with its master password")
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     store = VaultStore(args.dir)
     if not store.initialized:
-        _eprint(f"error: vault not initialized at {store.path}; run `apivault init`")
-        return 1
-    if not args.no_unlock:
+        _eprint(f"info: no vault at {store.path}; the GUI can create one on first run")
+    elif not args.no_unlock:
         try:
             password = _get_password(args)
             store.unlock(password)
@@ -345,6 +401,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             port=args.port,
             ttl_seconds=args.ttl,
             static_tokens=args.token,
+            open_browser=args.open,
         )
     except KeyboardInterrupt:
         pass
@@ -362,6 +419,8 @@ COMMANDS = {
     "rename": _cmd_rename,
     "export-env": _cmd_export_env,
     "change-password": _cmd_change_password,
+    "export": _cmd_export,
+    "import": _cmd_import,
     "serve": _cmd_serve,
 }
 

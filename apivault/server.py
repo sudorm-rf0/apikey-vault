@@ -21,10 +21,11 @@ import secrets
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Callable
+from pathlib import Path
 
 from apivault.store import (
     KeyNotFoundError,
+    VaultError,
     VaultLockedError,
     VaultNotInitializedError,
     VaultStore,
@@ -32,18 +33,42 @@ from apivault.store import (
 )
 
 MAX_BODY_BYTES = 1024 * 1024  # 1 MiB
+MAX_IMPORT_BYTES = 64 * 1024 * 1024  # 64 MiB
 DEFAULT_TTL_SECONDS = 12 * 3600
 UNLOCK_MAX_FAILURES = 5
 UNLOCK_COOLDOWN_SECONDS = 60
 
+WEB_DIR = Path(__file__).resolve().parent / "web"
+
+MIME_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+}
+
+CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; "
+    "img-src 'self' data:; connect-src 'self'; base-uri 'none'; "
+    "form-action 'self'"
+)
+
 
 class TokenStore:
-    """In-memory bearer tokens. Only SHA-256 digests are stored."""
+    """In-memory bearer tokens. Only SHA-256 digests are stored.
+
+    Static tokens (from ``--token``) live in a separate set: locking the vault
+    revokes dynamic session tokens but keeps static agent tokens valid (key
+    endpoints still return 423 until the vault is unlocked again).
+    """
 
     def __init__(self, static_tokens: list[str] | None = None):
-        self._tokens: dict[str, float | None] = {}  # digest -> expiry (None = static)
+        self._tokens: dict[str, float] = {}  # digest -> expiry
+        self._static: set[str] = set()       # static digests (never expire)
         for token in static_tokens or []:
-            self._tokens[_digest(token)] = None
+            self._static.add(_digest(token))
 
     def issue(self, ttl_seconds: int) -> str:
         token = secrets.token_urlsafe(32)
@@ -52,9 +77,11 @@ class TokenStore:
 
     def verify(self, token: str) -> bool:
         d = _digest(token)
+        if d in self._static:
+            return True
         exp = self._tokens.get(d)
         if exp is None:
-            return d in self._tokens
+            return False
         if exp < time.time():
             self._tokens.pop(d, None)
             return False
@@ -64,6 +91,7 @@ class TokenStore:
         self._tokens.pop(_digest(token), None)
 
     def revoke_all(self) -> None:
+        """Revoke every dynamic token; static tokens are preserved."""
         self._tokens.clear()
 
 
@@ -162,7 +190,11 @@ class _Handler(BaseHTTPRequestHandler):
         method = self.command
         ip = self._client_ip()
 
-        if parts == ["v1", "health"] and method == "GET":
+        if method == "GET" and (parts == [] or parts[0] == "app"):
+            self._serve_static(parts)
+        elif parts == ["v1", "init"] and method == "POST":
+            self._init_vault()
+        elif parts == ["v1", "health"] and method == "GET":
             self._health()
         elif parts == ["v1", "unlock"] and method == "POST":
             self._unlock(ip)
@@ -184,6 +216,18 @@ class _Handler(BaseHTTPRequestHandler):
             token = self._require_token()
             if token is not None:
                 self._delete_key(parts[2])
+        elif parts == ["v1", "export"] and method == "GET":
+            token = self._require_token()
+            if token is not None:
+                self._export_vault()
+        elif parts == ["v1", "import"] and method == "POST":
+            token = self._require_token()
+            if token is not None:
+                self._import_vault()
+        elif parts == ["v1", "password"] and method == "POST":
+            token = self._require_token()
+            if token is not None:
+                self._change_password()
         else:
             self._error(404, "not found")
 
@@ -311,6 +355,114 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._send(200, {"status": "deleted", "name": name})
 
+    # ------------------------------------------------------------- static
+    def _serve_static(self, parts: list[str]) -> None:
+        if parts == []:
+            rel = "index.html"
+        else:
+            rel = "/".join(parts[1:])  # parts[0] == "app"
+        rel_path = Path(rel)
+        if ".." in rel_path.parts:
+            self._error(400, "bad path")
+            return
+        base = WEB_DIR.resolve()
+        target = (base / rel_path).resolve()
+        if not str(target).startswith(str(base)):
+            self._error(400, "bad path")
+            return
+        if not target.is_file():
+            self._error(404, "not found")
+            return
+        body = target.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", MIME_TYPES.get(target.suffix, "application/octet-stream"))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", CSP)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _init_vault(self) -> None:
+        """Create the vault on first run (no auth: only works when absent)."""
+        if self.server.vault.initialized:
+            self._error(409, "vault already initialized")
+            return
+        try:
+            data = self._read_json()
+        except Exception:
+            self._error(400, "invalid request body")
+            return
+        password = data.get("password")
+        description = data.get("description")
+        if not isinstance(password, str) or not password:
+            self._error(400, "password (string) is required")
+            return
+        if description is not None and not isinstance(description, str):
+            self._error(400, "description must be a string")
+            return
+        try:
+            self.server.vault.initialize(password, description)
+        except Exception:
+            self._error(500, "failed to initialize vault")
+            return
+        self._send(201, {"status": "created"})
+
+    # ------------------------------------------------------ vault lifecycle
+    def _export_vault(self) -> None:
+        if not self._check_unlocked():
+            return
+        data = self.server.vault.export_bytes()
+        filename = "apikey-vault-" + time.strftime("%Y%m%d-%H%M%S") + ".db"
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _import_vault(self) -> None:
+        if not self._check_unlocked():
+            return
+        length = int(self.headers.get("Content-Length") or 0)
+        if length <= 0 or length > MAX_IMPORT_BYTES:
+            self._error(400, "invalid or oversized request body")
+            return
+        data = self.rfile.read(length)
+        try:
+            self.server.vault.import_bytes(data)
+        except VaultError as exc:
+            self._error(400, str(exc))
+            return
+        self.server.tokens.revoke_all()
+        self._send(200, {"status": "imported", "locked": True})
+
+    def _change_password(self) -> None:
+        if not self._check_unlocked():
+            return
+        try:
+            data = self._read_json()
+        except Exception:
+            self._error(400, "invalid request body")
+            return
+        old_pw = data.get("old_password")
+        new_pw = data.get("new_password")
+        if not isinstance(old_pw, str) or not isinstance(new_pw, str) or not new_pw:
+            self._error(400, "old_password and new_password (strings) are required")
+            return
+        if not self.server.vault.verify_password(old_pw):
+            self._error(401, "old password is incorrect")
+            return
+        try:
+            self.server.vault.change_password(new_pw)
+        except Exception:
+            self._error(500, "failed to change password")
+            return
+        self._send(200, {"status": "password_changed"})
+
     # ---------------------------------------------------------------- entry
     def do_GET(self) -> None:  # noqa: N802
         self._route()
@@ -332,13 +484,19 @@ def serve(
     port: int = 8417,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
     static_tokens: list[str] | None = None,
+    open_browser: bool = False,
 ) -> None:
     """Run the HTTP server until KeyboardInterrupt."""
     httpd = VaultHTTPServer(
         (host, port), store, ttl_seconds=ttl_seconds, static_tokens=static_tokens
     )
-    print(f"apikey-vault API listening on http://{host}:{port}  (vault: {store.path})")
-    print(f"health: GET /v1/health | unlock: POST /v1/unlock")
+    url = f"http://{host}:{port}"
+    print(f"apikey-vault listening on {url}  (vault: {store.path})")
+    print(f"GUI: {url}/   |   API health: {url}/v1/health")
+    if open_browser:
+        import webbrowser
+
+        webbrowser.open(url)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -9,7 +9,9 @@ from __future__ import annotations
 import base64
 import ctypes
 import os
+import shutil
 import sqlite3
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -392,6 +394,91 @@ class VaultStore:
             if self._key is not None:
                 _wipe(self._key)
             self._key = new_key
+
+    # ------------------------------------------------------- export/import
+    def export_bytes(self) -> bytes:
+        """Return the raw encrypted database file.
+
+        Safe to move between devices: every secret is AES-256-GCM ciphertext
+        and the file can only be unlocked with the master password. Requires an
+        unlocked vault so WAL is fully checkpointed into the main file.
+        """
+        with self._lock:
+            self._require_key()
+            db = self._connect()
+            db.execute("PRAGMA wal_checkpoint(FULL)")
+            db.commit()
+            return self.path.read_bytes()
+
+    def import_bytes(self, data: bytes) -> None:
+        """Atomically replace the vault with another encrypted database.
+
+        The uploaded bytes are validated (must be a SQLite vault containing a
+        salt and verify blob) before anything is touched. The vault is left
+        locked afterwards because the in-memory key no longer matches.
+        """
+        if not data:
+            raise VaultError("import data is empty")
+        if len(data) > 64 * 1024 * 1024:
+            raise VaultError("import data too large (limit 64 MiB)")
+        with self._lock:
+            # Validate the candidate file in a temp location first.
+            self.dir.mkdir(parents=True, exist_ok=True)
+            fd, tmp_path = tempfile.mkstemp(
+                prefix="apivault-import-", suffix=".db", dir=str(self.dir)
+            )
+            try:
+                with os.fdopen(fd, "wb") as fh:
+                    fh.write(data)
+                self._validate_db_file(tmp_path)
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
+
+            # Commit and close the live connection, then swap files.
+            if self._db is not None:
+                self._db.execute("PRAGMA wal_checkpoint(FULL)")
+                self._db.commit()
+                self._db.close()
+                self._db = None
+            if self._key is not None:
+                _wipe(self._key)
+                self._key = None
+
+            shutil.move(tmp_path, self.path)
+            for suffix in ("-wal", "-shm"):
+                try:
+                    os.unlink(str(self.path) + suffix)
+                except OSError:
+                    pass
+            self._chmod_private()
+
+    @staticmethod
+    def _validate_db_file(path: str) -> None:
+        """Raise VaultError unless ``path`` looks like a valid vault database."""
+        try:
+            con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        except sqlite3.Error as exc:
+            raise VaultError(f"imported file is not a valid vault: {exc}") from exc
+        try:
+            rows = con.execute(
+                "SELECT key FROM meta WHERE key IN ('salt', 'verify')"
+            ).fetchall()
+            tables = [
+                r[0]
+                for r in con.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            ]
+        except sqlite3.Error as exc:
+            raise VaultError(f"imported file is not a valid vault: {exc}") from exc
+        finally:
+            con.close()
+        if len(rows) != 2 or "keys" not in tables or "meta" not in tables:
+            raise VaultError("imported file is not a valid apikey-vault database")
 
     def close(self) -> None:
         with self._lock:
