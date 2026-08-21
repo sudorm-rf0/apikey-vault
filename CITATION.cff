@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use apikey-vault in your work, please cite it as follows."
+title: "apikey-vault — local encrypted API-key vault for AI agents"
+version: 0.6.0
+date-released: 2026-08-21
+authors:
+  - family-names: "sudorm-rf0"
+    given-names: "sudorm"
+keywords:
+  - api-keys
+  - secrets
+  - encryption
+  - ai-agents
+  - security
+license: MIT

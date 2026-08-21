@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest an idea for apikey-vault
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for sharing an idea!
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the pain point in one or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What should the feature look like?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered

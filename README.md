@@ -1,10 +1,27 @@
-# apikey-vault 🔐
+# 🔐 apikey-vault
 
-本地加密的 **API 密钥保险箱**，带图形界面，专为 AI Agent（Codex / Claude 等）与多设备使用设计。
+> 本地加密的 API 密钥保险箱 —— 面向 AI Agent（Codex / Claude）与多设备，**防止明文密钥进入 AI 对话框**。
+
+<div align="center">
+
+[![CI](https://github.com/sudorm-rf0/apikey-vault/actions/workflows/ci.yml/badge.svg)](https://github.com/sudorm-rf0/apikey-vault/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/sudorm-rf0/apikey-vault)](https://github.com/sudorm-rf0/apikey-vault/releases)
+[![License](https://img.shields.io/github/license/sudorm-rf0/apikey-vault)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
+[![macOS](https://img.shields.io/badge/macOS-15%2B-9cf)](script/build_and_run.sh)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+
+</div>
 
 把密钥明文写在 `.env` 或 shell profile 里很危险：可能被误提交进 Git、被 Agent 带进对话
 上下文、散落各处难以轮换。`apikey-vault` 把所有密钥用 **AES-256-GCM** 加密后存在本地
 SQLite 中：人类用**图形界面或 CLI** 管理，Agent 用 CLI 或本地 HTTP API 按需获取。
+
+- **Web GUI**（浏览器单页应用，内置中/英文）· **原生 macOS App**（SwiftUI + Liquid Glass）
+- **浏览器扩展 Key Guard**（Chrome/Edge）：在 AI 对话框输入框里自动拦截明文密钥
+- **Git 多端同步**：加密 vault 通过私有仓库在设备间同步
+
+> 30 秒体验：`./scripts/demo.sh`（创建临时 vault，不碰你的真实数据）
 
 ## ✨ 特性
 
@@ -245,6 +262,66 @@ node tests/test_patterns.js
 覆盖密码学往返/篡改、存储 CRUD/改密/导出导入（含导入自动备份）、CLI 端到端、
 HTTP API 全链路（含鉴权、限速、静态 GUI、首启初始化）、Key Guard 密钥模式、
 Swift 客户端↔真实后端往返。
+
+## 📚 常见问题（FAQ）
+
+**密钥放在哪？安全吗？**
+默认 `~/.apikey-vault/vault.db`，全部为 AES-256-GCM 密文；主密码经 scrypt 派生，
+永不落盘。即使文件被复制走，没有主密码也无法还原。
+
+**为什么复制密钥默认给的是 `{{NAME}}` 占位符？**
+这是产品设计：防止你把明文密钥误粘贴进 AI 对话框。需要真实值时点
+「Plaintext…」（会警告），或用 `apivault get <name>` 注入环境。
+
+**Agent 怎么用我的密钥？**
+`apivault get OPENAI_API_KEY`（值只进 stdout，不进对话）；或 `apivault serve`
+启动本地 API 供 Agent 调用；浏览器里粘贴会被 Key Guard 自动脱敏成
+`{{REDACTED}}` / `{{vault:NAME}}`。
+
+**怎么在多台设备之间同步？**
+`apivault sync push|pull --repo <私有仓库>`（或 Web GUI 设置面板一键同步）。
+同步的是密文，仓库泄露也没关系。
+
+**想改主密码 / 换设备 / 删除密钥？**
+`apivault change-password`；跨设备用 `apivault export` / `import`（导入前自动备份）；
+删除用 `apivault delete <name>`。
+
+**出了环境问题怎么排查？**
+`apivault doctor` 一键诊断（Python/加密库/git/vault 权限/同步配置）。
+
+## 🧱 仓库结构
+
+```
+apivault/            Python 包：CLI + HTTP API + 加密存储 + Web GUI
+macos/               原生 macOS App（SwiftUI：APIVaultCore / APIVaultApp / SelfTest）
+extension/           Key Guard 浏览器扩展（Chrome/Edge MV3）
+tests/               pytest 测试 + Key Guard 模式测试
+script/              原生 App 的构建/运行/测试入口
+scripts/             打包与演示脚本（web 包、扩展 zip、demo）
+docs/                API 文档与截图
+```
+
+## 🗺️ 路线图
+
+- [x] 加密存储 + CLI + HTTP API（v0.1）
+- [x] Web GUI + 多端访问 + 导出/导入（v0.2）
+- [x] 原生 macOS App（Apple 设计）（v0.3）
+- [x] Key Guard 防泄露（界面 + 扩展 + Agent 规范）（v0.4）
+- [x] 自动锁定 / 导入备份 / 扩展增强（v0.5）
+- [x] Git 多端同步 / doctor / 双语界面 / 设置面板（v0.6）
+- [ ] Windows/Linux 独立端（Electron/Tauri）
+- [ ] 扩展上架 Chrome Web Store / Edge Add-ons
+- [ ] 更多密钥格式检测与自定义模式
+
+## 🤝 社区
+
+- 报告问题：[Issues](https://github.com/sudorm-rf0/apikey-vault/issues)（用模板）
+- 贡献代码：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 报告安全漏洞：[SECURITY.md](SECURITY.md)
+- 行为准则：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- 引用本项目：[CITATION.cff](CITATION.cff)
+
+如果你觉得有用，欢迎 ⭐ Star 这个仓库，帮助更多开发者安全地管理 API 密钥。
 
 ## 🛠️ 故障排查
 
