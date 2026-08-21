@@ -4,6 +4,8 @@
 
 <div align="center">
 
+<img src="docs/banner.png" alt="apikey-vault" width="640">
+
 <!-- Live CI badge (enable Actions in repo Settings → Actions to activate): -->
 <!-- https://github.com/sudorm-rf0/apikey-vault/actions/workflows/ci.yml/badge.svg -->
 [![Tests](https://img.shields.io/badge/tests-pytest%2046%20%7C%20patterns%2011%20%7C%20swift%20selftest%20OK-brightgreen)](script/test.sh)
@@ -324,6 +326,9 @@ docs/                API 文档与截图
 - 引用本项目：[CITATION.cff](CITATION.cff)
 
 如果你觉得有用，欢迎 ⭐ Star 这个仓库，帮助更多开发者安全地管理 API 密钥。
+
+> 小贴士：`docs/banner.png` 可作为仓库的 **Social preview**（GitHub 仓库
+> Settings → Social preview → Upload），链接分享到社交平台时会显示这张横幅。
 
 ## 🛠️ 故障排查
 
