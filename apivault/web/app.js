@@ -85,6 +85,11 @@ async function setLocked(locked) {
   if (locked) {
     $("unlock-password").value = "";
     $("unlock-error").hidden = true;
+    $("paste-input").value = "";
+    $("paste-name").value = "";
+    $("paste-desc").value = "";
+    $("paste-status").textContent = "";
+    showPasteBox(false);
     $("unlock-password").focus();
   } else {
     setStatus("Vault unlocked.");
@@ -137,6 +142,7 @@ function selectKey(name) {
 
   $("empty-detail").hidden = true;
   $("editor").hidden = true;
+  showPasteBox(true);
   $("key-detail").hidden = false;
   $("detail-name").textContent = key.name;
   $("detail-desc").textContent = key.description || "—";
@@ -184,15 +190,96 @@ async function loadKeys() {
 function showEmptyDetail() {
   $("key-detail").hidden = true;
   $("editor").hidden = true;
+  showPasteBox(true);
   $("empty-detail").hidden = false;
   $("empty-text").textContent =
     state.keys.length === 0 ? "No keys yet — add one." : "Select a key to view it.";
+}
+
+/* ------------------------------------------------------- paste a key */
+function showPasteBox(show) {
+  $("paste-box").hidden = !show;
+}
+
+function unquoteValue(s) {
+  let v = s.trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1);
+  }
+  return v;
+}
+
+/* Parse pasted text into [{name, value}].
+   Accepts one or more `NAME=value` lines (optionally prefixed with `export `,
+   values may be quoted), or a single bare value combined with the name field. */
+function parsePasted(text, nameField) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const entries = [];
+  for (const line of lines) {
+    const m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*)$/);
+    if (m) {
+      entries.push({ name: m[1], value: unquoteValue(m[2]) });
+    } else {
+      if (lines.length > 1) {
+        throw new Error("line has no NAME= prefix: " + line.slice(0, 40));
+      }
+      if (!nameField) {
+        throw new Error("enter a key name for the pasted value");
+      }
+      entries.push({ name: nameField, value: unquoteValue(line) });
+    }
+  }
+  return entries;
+}
+
+async function onPasteSave() {
+  const text = $("paste-input").value;
+  const nameField = $("paste-name").value.trim();
+  const desc = $("paste-desc").value.trim();
+  $("paste-status").textContent = "";
+  if (!text.trim()) {
+    setStatus("Paste a key first.", "error");
+    return;
+  }
+  let entries;
+  try {
+    entries = parsePasted(text, nameField);
+  } catch (err) {
+    $("paste-status").textContent = err.message;
+    setStatus("Cannot parse paste: " + err.message, "error");
+    return;
+  }
+  let created = 0;
+  let updated = 0;
+  for (const entry of entries) {
+    const res = await api("PUT", "/v1/keys/" + encodeURIComponent(entry.name), {
+      body: { value: entry.value, description: desc || undefined },
+    });
+    if (res.status === 201) created += 1;
+    else if (res.status === 200) updated += 1;
+    else {
+      setStatus("Failed to save " + entry.name + ": " + (await safeError(res)), "error");
+      return;
+    }
+  }
+  $("paste-input").value = "";
+  $("paste-name").value = "";
+  $("paste-status").textContent = "";
+  await loadKeys();
+  selectKey(entries[0].name);
+  const msg = created > 0 ? "Stored " + created + " key" + (created === 1 ? "" : "s") : "";
+  const upd = updated > 0 ? (msg ? ", updated " + updated : "Updated " + updated) : "";
+  setStatus(msg + upd + ".", "ok");
 }
 
 /* ---------------------------------------------------------------- editor */
 function openEditor(mode, key) {
   $("key-detail").hidden = true;
   $("empty-detail").hidden = true;
+  showPasteBox(false);
   $("editor").hidden = false;
   $("editor-title").textContent = mode === "add" ? "Add key" : "Rename key";
   $("edit-name").value = key ? key.name : "";
@@ -617,6 +704,15 @@ function wire() {
   $("editor-cancel").addEventListener("click", () => {
     if (state.selected) selectKey(state.selected);
     else showEmptyDetail();
+  });
+  $("paste-save").addEventListener("click", onPasteSave);
+  $("paste-clear").addEventListener("click", () => {
+    $("paste-input").value = "";
+    $("paste-name").value = "";
+    $("paste-status").textContent = "";
+  });
+  $("paste-input").addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") onPasteSave();
   });
   $("copy-btn").addEventListener("click", copyValue);
   $("reveal-btn").addEventListener("click", () => revealValue());

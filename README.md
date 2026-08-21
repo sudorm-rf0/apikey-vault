@@ -8,7 +8,8 @@ SQLite 中：人类用**图形界面或 CLI** 管理，Agent 用 CLI 或本地 H
 
 ## ✨ 特性
 
-- **图形界面（GUI）**：浏览器单页应用，锁定/解锁门禁、密钥库列表、密钥输入/编辑、一键复制、
+- **图形界面（GUI）**：浏览器单页应用，锁定/解锁门禁、密钥库列表、**密钥粘贴输入框**
+  （支持多行 `NAME=value`、`export` 前缀、带引号值、裸值+名称）、密钥输入/编辑、一键复制、
   显示/隐藏、重命名、删除、改密、导出/导入、首启初始化。
 - **加密存储**：AES-256-GCM 认证加密 + scrypt 密钥派生；主密码永不落盘；磁盘上无明文。
 - **人类 CLI**：`store` / `get` / `list` / `delete` / `rename` / `export-env` / `change-password` / `export` / `import`。
@@ -24,8 +25,9 @@ SQLite 中：人类用**图形界面或 CLI** 管理，Agent 用 CLI 或本地 H
 ## 📸 界面预览
 
 ![锁定界面](docs/screenshot-locked.png)
-![密钥库](docs/screenshot-unlocked.png)
+![密钥库（含粘贴输入框）](docs/screenshot-unlocked.png)
 ![密钥详情](docs/screenshot-detail.png)
+![粘贴密钥](docs/screenshot-paste.png)
 
 ## 📦 安装
 
@@ -42,7 +44,9 @@ apivault serve --open        # 启动并自动打开浏览器 http://127.0.0.1:8
 ```
 
 - **首次使用**：界面会引导你创建保险库（设置主密码）。
-- 之后每次打开：输入主密码解锁 → 增删改查密钥库。
+- 之后每次打开：输入主密码解锁 → 在顶部 **Paste a key** 框直接粘贴密钥
+  （`OPENAI_API_KEY=sk-...`，可一次粘贴多行；`Cmd/Ctrl+Enter` 快速保存），
+  或点左侧 **Add key** 逐个填写。
 - 底部栏可**锁定 / 改密 / 导出加密 vault / 导入加密 vault**。
 
 ### 多端访问（局域网）

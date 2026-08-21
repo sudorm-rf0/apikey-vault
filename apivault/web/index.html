@@ -133,6 +133,25 @@
           </aside>
 
           <section class="detail">
+            <!-- quick paste box: paste NAME=value lines or a single value -->
+            <div id="paste-box" class="panel" hidden>
+              <div class="paste-head">
+                <h2>Paste a key</h2>
+                <span class="muted hint">one or more <code>NAME=value</code> lines, or a single value</span>
+              </div>
+              <textarea id="paste-input" rows="3" spellcheck="false" autocomplete="off"
+                placeholder="OPENAI_API_KEY=sk-...&#10;ANTHROPIC_API_KEY=sk-ant-...&#10;GITHUB_TOKEN=ghp_..."></textarea>
+              <div class="paste-extra">
+                <input type="text" id="paste-name" placeholder="Key name (needed for a bare value)" spellcheck="false" autocomplete="off">
+                <input type="text" id="paste-desc" placeholder="Description (optional)" spellcheck="false" autocomplete="off">
+              </div>
+              <div class="paste-actions">
+                <button id="paste-save" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Save keys</button>
+                <button id="paste-clear" class="ghost">Clear</button>
+                <span id="paste-status" class="muted"></span>
+              </div>
+            </div>
+
             <div id="empty-detail" class="empty">
               <svg class="icon big muted" aria-hidden="true"><use href="#i-key"/></svg>
               <p id="empty-text">No keys yet — add one.</p>

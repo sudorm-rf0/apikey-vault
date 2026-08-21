@@ -223,6 +223,36 @@ button.link:hover { color: var(--green); border: none; }
 .meta dd { word-break: break-all; }
 
 /* ------------------------------------------------------------- editor */
+#paste-box { border: 1px solid var(--border-strong); background: var(--panel); padding: 16px 18px; margin-bottom: 18px; }
+.paste-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.paste-head h2 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+.paste-head .hint { font-size: 11px; }
+
+#paste-input {
+  width: 100%;
+  margin-top: 12px;
+  background: var(--input);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 10px;
+  border-radius: 0;
+  outline: none;
+  resize: vertical;
+  min-height: 72px;
+}
+#paste-input:focus { border-color: var(--green); }
+
+.paste-extra { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.paste-extra input { width: 100%; }
+.paste-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+#paste-status { font-size: 12px; }
+
+@media (max-width: 760px) {
+  .paste-extra { grid-template-columns: 1fr; }
+}
+
 #editor { border: 1px solid var(--border-strong); background: var(--panel); padding: 20px; margin-top: 18px; }
 #editor h2 { font-size: 14px; margin-bottom: 14px; letter-spacing: 0.06em; text-transform: uppercase; }
 
