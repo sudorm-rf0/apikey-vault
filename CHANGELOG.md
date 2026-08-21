@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0 (2026-08-21)
+
+### Features
+- **Git-based multi-device sync**: `apivault sync push|pull|status [--repo URL]`
+  (or `$APIVAULT_SYNC_REPO`); only the encrypted `vault.db` is tracked; on a
+  conflict the local vault wins; pull replaces the local vault with a backup.
+  Server endpoint `POST /v1/sync` + a **Sync button in the web GUI**.
+- **`apivault doctor`**: environment diagnostics (Python, cryptography, git,
+  vault state/permissions, sync repo, vault readability).
+- **Web GUI settings panel**: language (English / 中文), auto-lock timeout,
+  sync repository URL, and one-click Push / Pull / Status.
+- **Web GUI is now bilingual** (en / zh-CN) via a lightweight i18n layer.
+- **Key Guard extension packaged** as `dist/apikey-vault-guard.zip`
+  (`scripts/package_extension.sh`).
+
 ## 0.5.0 (2026-08-21)
 
 ### Security & robustness

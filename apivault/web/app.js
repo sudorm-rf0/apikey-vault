@@ -18,8 +18,12 @@ const state = {
 let statusTimer = null;
 let revealTimer = null;
 
-// Auto-lock after inactivity so an unlocked vault does not stay open forever.
-const AUTO_LOCK_MS = 15 * 60 * 1000;
+// Auto-lock after inactivity (configurable in Settings; 0 = off).
+function autoLockMs() {
+  const mins = parseInt(localStorage.getItem("apivault_autolock") || "15", 10);
+  return mins > 0 ? mins * 60 * 1000 : 0;
+}
+
 let lastActivity = Date.now();
 let idleTimer = null;
 
@@ -33,8 +37,9 @@ function startIdleMonitor() {
   );
   clearInterval(idleTimer);
   idleTimer = setInterval(() => {
-    if (state.unlocked && Date.now() - lastActivity > AUTO_LOCK_MS) {
-      onLock("Auto-locked after 15 minutes of inactivity.");
+    const limit = autoLockMs();
+    if (state.unlocked && limit > 0 && Date.now() - lastActivity > limit) {
+      onLock(t("autoLocked"));
     }
   }, 30000);
 }
@@ -82,7 +87,7 @@ function setStatus(text, kind = "") {
   clearTimeout(statusTimer);
   if (kind !== "error") {
     statusTimer = setTimeout(() => {
-      el.textContent = "Ready.";
+      el.textContent = t("ready");
       el.className = "status-text";
     }, 5000);
   }
@@ -96,12 +101,15 @@ async function setLocked(locked) {
   clearTimeout(revealTimer);
 
   $("app").classList.toggle("unlocked", !locked);
-  $("lock-label").textContent = locked ? "LOCKED" : "UNLOCKED";
+  $("lock-label").dataset.i18n = locked ? "locked" : "unlocked";
+  applyI18n();
   showScreen(locked ? "unlock" : "vault");
   $("lock-btn").hidden = locked;
   $("change-pw-btn").hidden = locked;
   $("export-btn").hidden = locked;
   $("import-btn").hidden = locked;
+  $("sync-btn").hidden = locked;
+  $("settings-btn").hidden = locked;
 
   if (locked) {
     $("unlock-password").value = "";
@@ -114,7 +122,7 @@ async function setLocked(locked) {
     showPasteBox(false);
     $("unlock-password").focus();
   } else {
-    setStatus("Vault unlocked.");
+    setStatus(t("lockMessage"));
     await loadKeys();
   }
 }
@@ -184,8 +192,12 @@ function setRevealButton(revealed) {
   const btn = $("reveal-btn");
   btn.textContent = "";
   btn.appendChild(svgIcon(revealed ? "i-eye-off" : "i-eye"));
-  btn.appendChild(document.createTextNode(revealed ? "Hide" : "Reveal"));
-  $("reveal-inline").textContent = revealed ? "Hide" : "Reveal";
+  const label = document.createElement("span");
+  label.id = "reveal-label";
+  label.dataset.i18n = revealed ? "hide" : "reveal";
+  label.textContent = t(revealed ? "hide" : "reveal");
+  btn.appendChild(label);
+  $("reveal-inline").textContent = t(revealed ? "hide" : "reveal");
 }
 
 function svgIcon(symbolId) {
@@ -215,8 +227,8 @@ function showEmptyDetail() {
   $("editor").hidden = true;
   showPasteBox(true);
   $("empty-detail").hidden = false;
-  $("empty-text").textContent =
-    state.keys.length === 0 ? "No keys yet — add one." : "Select a key to view it.";
+  $("empty-text").dataset.i18n = state.keys.length === 0 ? "noKeysYet" : "selectKeyHint";
+  applyI18n();
 }
 
 /* ------------------------------------------------------- paste a key */
@@ -264,7 +276,7 @@ async function onPasteSave() {
   const desc = $("paste-desc").value.trim();
   $("paste-status").textContent = "";
   if (!text.trim()) {
-    setStatus("Paste a key first.", "error");
+    setStatus(t("pasteFirst"), "error");
     return;
   }
   let entries;
@@ -293,9 +305,11 @@ async function onPasteSave() {
   $("paste-status").textContent = "";
   await loadKeys();
   selectKey(entries[0].name);
-  const msg = created > 0 ? "Stored " + created + " key" + (created === 1 ? "" : "s") : "";
+  const msg = created > 0 ? tf("storedCount", { n: created, extra: "" }) : "";
   const upd = updated > 0 ? (msg ? ", updated " + updated : "Updated " + updated) : "";
-  setStatus(msg + upd + ".", "ok");
+  setStatus(
+      (msg + upd + ".").replace("..", "."), "ok"
+    );
 }
 
 /* ---------------------------------------------------------------- editor */
@@ -304,7 +318,7 @@ function openEditor(mode, key) {
   $("empty-detail").hidden = true;
   showPasteBox(false);
   $("editor").hidden = false;
-  $("editor-title").textContent = mode === "add" ? "Add key" : "Rename key";
+  $("editor-title").textContent = t(mode === "add" ? "addKeyTitle" : "renameKeyTitle");
   $("edit-name").value = key ? key.name : "";
   $("edit-desc").value = key ? key.description || "" : "";
   $("edit-value").value = "";
@@ -319,7 +333,7 @@ async function onEditorSave(e) {
   const desc = $("edit-desc").value.trim();
   const value = $("edit-value").value;
   if (!name) {
-    setStatus("Name is required.", "error");
+    setStatus(t("nameRequired"), "error");
     return;
   }
 
@@ -344,10 +358,10 @@ async function onEditorSave(e) {
       return;
     }
     await api("DELETE", "/v1/keys/" + encodeURIComponent(oldName));
-    setStatus(`Renamed ${oldName} → ${name}.`, "ok");
+    setStatus(tf("renamed", { old: oldName, new: name }), "ok");
   } else {
     if (!value) {
-      setStatus("Value is required.", "error");
+      setStatus(t("valueRequired"), "error");
       return;
     }
     const res = await api("PUT", "/v1/keys/" + encodeURIComponent(name), {
@@ -358,7 +372,7 @@ async function onEditorSave(e) {
       return;
     }
     setStatus(
-      res.status === 201 ? `Stored ${name}.` : `Updated ${name}.`,
+      res.status === 201 ? tf("storedName", { name }) : tf("updatedName", { name }),
       "ok"
     );
   }
@@ -416,9 +430,7 @@ async function copyValue() {
   const placeholder = "{{" + name + "}}";
   const ok = await copyText(placeholder);
   setStatus(
-    ok
-      ? `Copied placeholder ${placeholder} (safe). For the real value use “Plaintext…” — never paste keys into AI chats.`
-      : "Copy failed.",
+    ok ? tf("copiedPlaceholder", { name }) : "Copy failed.",
     ok ? "ok" : "error"
   );
 }
@@ -446,7 +458,7 @@ async function copyPlaintext() {
   const ok = await copyText(value);
   setStatus(
     ok
-      ? `Plaintext ${name} copied. ⚠ Do not paste it into AI chats — it stays on the clipboard until replaced.`
+      ? tf("plaintextCopied", { name })
       : "Copy failed.",
     ok ? "error" : "error"
   );
@@ -494,7 +506,7 @@ async function deleteSelected() {
     setStatus("Delete failed: " + (await safeError(res)), "error");
     return;
   }
-  setStatus(`Deleted ${name}.`, "ok");
+  setStatus(tf("deletedName", { name }), "ok");
   await loadKeys();
 }
 
@@ -542,7 +554,7 @@ async function changePassword() {
     setStatus("Password change failed: " + err, "error");
     return;
   }
-  setStatus("Master password changed.", "ok");
+  setStatus(t("passwordChanged"), "ok");
 }
 
 /* ------------------------------------------------------------ export */
@@ -564,7 +576,7 @@ async function exportVault() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-  setStatus(`Exported encrypted vault (${filename}). Safe to move between devices.`, "ok");
+  setStatus(t("exported"), "ok");
 }
 
 /* ------------------------------------------------------------ import */
@@ -589,7 +601,7 @@ async function importVault(file) {
   sessionStorage.removeItem("apivault_token");
   state.token = null;
   setLocked(true);
-  setStatus("Vault imported — unlock with its master password.", "ok");
+  setStatus(t("imported"), "ok");
 }
 
 /* -------------------------------------------------------------- modal */
@@ -656,7 +668,7 @@ async function onInit(e) {
     sessionStorage.setItem("apivault_token", d.token);
   }
   setLocked(false);
-  setStatus("Vault created and unlocked.", "ok");
+  setStatus(t("vaultCreated"), "ok");
 }
 
 /* --------------------------------------------------------- unlock flows */
@@ -704,7 +716,7 @@ async function onTokenConnect(e) {
   }
 }
 
-async function onLock(message = "Vault locked.") {
+async function onLock(message = t("lockMessage")) {
   await api("POST", "/v1/lock", { noAuthReset: true });
   sessionStorage.removeItem("apivault_token");
   state.token = null;
@@ -739,6 +751,100 @@ async function init() {
   setLocked(true);
 }
 
+/* ------------------------------------------------- settings & sync */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function openSettings() {
+  const lang = currentLang;
+  const autolock = localStorage.getItem("apivault_autolock") || "15";
+  const repo = localStorage.getItem("apivault_sync_repo") || "";
+  const mins = [0, 5, 15, 30, 60]
+    .map(
+      (m) =>
+        `<option value="${m}"${Number(autolock) === m ? " selected" : ""}>` +
+        (m === 0 ? t("off") : m + " " + t("min")) +
+        `</option>`
+    )
+    .join("");
+  const body = `
+    <div class="settings-form">
+      <div class="settings-row">
+        <label for="settings-lang">${t("language")}</label>
+        <select id="settings-lang">
+          <option value="en"${lang === "en" ? " selected" : ""}>English</option>
+          <option value="zh"${lang === "zh" ? " selected" : ""}>中文</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <label for="settings-autolock">${t("autoLockLabel")}</label>
+        <select id="settings-autolock">${mins}</select>
+      </div>
+      <hr>
+      <div class="settings-row">
+        <label for="settings-repo">${t("syncRepoLabel")}</label>
+        <input type="text" id="settings-repo" value="${escapeHtml(repo)}" placeholder="git@github.com:user/vault-sync.git" spellcheck="false">
+      </div>
+      <p class="hint muted">${t("syncHint")}</p>
+      <div class="sync-actions">
+        <button id="sync-push" class="primary">${t("push")}</button>
+        <button id="sync-pull">${t("pull")}</button>
+        <button id="sync-status">${t("status")}</button>
+      </div>
+      <pre id="sync-result" class="sync-result"></pre>
+    </div>`;
+  showModal({
+    title: t("settingsTitle"),
+    body,
+    actions: [{ label: t("close") }],
+  });
+
+  $("settings-lang").addEventListener("change", (e) => {
+    setLang(e.target.value);
+    $("modal-backdrop").hidden = true;
+    openSettings();
+  });
+  $("settings-autolock").addEventListener("change", (e) => {
+    localStorage.setItem("apivault_autolock", e.target.value);
+    setStatus(t("settingsSaved"));
+  });
+  $("settings-repo").addEventListener("change", (e) => {
+    localStorage.setItem("apivault_sync_repo", e.target.value.trim());
+  });
+  $("sync-push").addEventListener("click", () => runSync("push"));
+  $("sync-pull").addEventListener("click", () => runSync("pull"));
+  $("sync-status").addEventListener("click", () => runSync("status"));
+}
+
+async function runSync(action) {
+  const resultEl = $("sync-result");
+  const repo = ($("settings-repo").value || "").trim();
+  if (!repo) {
+    resultEl.textContent = t("syncNoRepo");
+    return;
+  }
+  localStorage.setItem("apivault_sync_repo", repo);
+  resultEl.textContent = t("working");
+  const res = await api("POST", "/v1/sync", { body: { action, repo } });
+  if (res.status !== 200) {
+    resultEl.textContent = await safeError(res);
+    return;
+  }
+  const data = await res.json();
+  if (action === "pull" && data.locked) {
+    $("modal-backdrop").hidden = true;
+    sessionStorage.removeItem("apivault_token");
+    state.token = null;
+    setLocked(true);
+    setStatus(t("imported"), "ok");
+    return;
+  }
+  resultEl.textContent = JSON.stringify(data, null, 2);
+}
+
 /* --------------------------------------------------------- wire up */
 function wire() {
   $("init-form").addEventListener("submit", onInit);
@@ -746,9 +852,9 @@ function wire() {
   $("token-form").addEventListener("submit", onTokenConnect);
   $("token-mode-btn").addEventListener("click", () => {
     $("token-form").hidden = !$("token-form").hidden;
-    $("token-mode-btn").textContent = $("token-form").hidden
-      ? "Use a bearer token instead"
-      : "Use the master password";
+    $("token-mode-btn").dataset.i18n = $("token-form").hidden ? "useToken" : "usePassword";
+    $("unlock-hint").dataset.i18n = $("token-form").hidden ? "unlockHint" : "unlockHintToken";
+    applyI18n();
     if (!$("token-form").hidden) $("token-input").focus();
   });
   $("lock-btn").addEventListener("click", onLock);
@@ -762,6 +868,8 @@ function wire() {
     if (state.selected) selectKey(state.selected);
     else showEmptyDetail();
   });
+  $("sync-btn").addEventListener("click", openSettings);
+  $("settings-btn").addEventListener("click", openSettings);
   $("paste-save").addEventListener("click", onPasteSave);
   $("paste-clear").addEventListener("click", () => {
     $("paste-input").value = "";
@@ -802,6 +910,7 @@ function wire() {
 
 document.addEventListener("DOMContentLoaded", () => {
   wire();
+  applyI18n();
   startIdleMonitor();
   init();
 });

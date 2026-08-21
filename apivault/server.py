@@ -23,6 +23,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from apivault import sync as vault_sync
 from apivault.store import (
     KeyNotFoundError,
     VaultError,
@@ -228,6 +229,10 @@ class _Handler(BaseHTTPRequestHandler):
             token = self._require_token()
             if token is not None:
                 self._change_password()
+        elif parts == ["v1", "sync"] and method == "POST":
+            token = self._require_token()
+            if token is not None:
+                self._sync_vault()
         else:
             self._error(404, "not found")
 
@@ -462,6 +467,43 @@ class _Handler(BaseHTTPRequestHandler):
             self._error(500, "failed to change password")
             return
         self._send(200, {"status": "password_changed"})
+
+    def _sync_vault(self) -> None:
+        """Push/pull/status against a git repository (multi-device sync)."""
+        if not self._check_unlocked():
+            return
+        try:
+            data = self._read_json()
+        except Exception:
+            self._error(400, "invalid request body")
+            return
+        action = data.get("action")
+        repo = data.get("repo") or vault_sync.default_repo()
+        if action not in ("push", "pull", "status"):
+            self._error(400, "action must be 'push', 'pull' or 'status'")
+            return
+        if not repo:
+            self._error(400, "no sync repo: pass 'repo' or set APIVAULT_SYNC_REPO")
+            return
+        try:
+            if action == "push":
+                result = vault_sync.push(
+                    self.server.vault.dir, repo, self.server.vault.export_bytes()
+                )
+                self._send(200, {"status": "ok", "result": result})
+            elif action == "pull":
+                path = vault_sync.pull(self.server.vault.dir, repo)
+                if path is None:
+                    self._send(200, {"status": "ok", "result": "nothing to pull"})
+                    return
+                self.server.vault.import_bytes(path.read_bytes())
+                self.server.tokens.revoke_all()
+                self._send(200, {"status": "ok", "result": "pulled", "locked": True})
+            else:
+                info = vault_sync.status(self.server.vault.dir, repo)
+                self._send(200, {"status": "ok", **info})
+        except vault_sync.SyncError as exc:
+            self._error(400, str(exc))
 
     # ---------------------------------------------------------------- entry
     def do_GET(self) -> None:  # noqa: N802

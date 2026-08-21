@@ -28,6 +28,7 @@ apivault serve [--host 127.0.0.1] [--port 8417] [--token TOKEN ...] [--ttl 43200
 | POST | `/v1/password` | 是 | 修改主密码（需旧密码） |
 | GET | `/v1/export` | 是 | 下载加密 vault 文件（跨设备迁移） |
 | POST | `/v1/import` | 是 | 上传加密 vault 文件替换本地（整体替换） |
+| POST | `/v1/sync` | 是 | Git 多端同步（push / pull / status） |
 
 ## 详细说明
 
@@ -121,6 +122,17 @@ apivault serve [--host 127.0.0.1] [--port 8417] [--token TOKEN ...] [--ttl 43200
 
 请求体为**原始文件字节**（非 JSON），上限 64 MiB。会整体替换当前保险库并
 **吊销全部 Token、锁定保险库**，之后需用新库的主密码重新解锁。非法文件返回 `400`。
+
+### POST /v1/sync
+
+Git 多端同步。请求体：`{"action": "push" | "pull" | "status", "repo": "<git-url>"}`
+（`repo` 缺省时使用环境变量 `APIVAULT_SYNC_REPO`）。
+
+- `push`：把当前加密 vault 推送到仓库 → `{"status":"ok","result":"pushed"}`
+- `pull`：从仓库拉取并替换本地（自动备份、吊销 Token、重新锁定）
+  → `{"status":"ok","result":"pulled","locked":true}`
+- `status`：返回 `ahead`/`behind`/`has_remote_vault` 等差异信息
+- 需要已解锁（push 需导出加密库）；失败返回 `400 {"error": ...}`
 
 ## 错误码
 

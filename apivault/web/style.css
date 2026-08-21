@@ -302,6 +302,32 @@ button.link:hover { color: var(--green); border: none; }
 
 .clipboard-helper { position: fixed; top: 0; left: 0; opacity: 0; pointer-events: none; z-index: -1; }
 
+.settings-form { display: flex; flex-direction: column; gap: 12px; }
+.settings-row { display: flex; align-items: center; gap: 12px; }
+.settings-row label { margin: 0; min-width: 170px; }
+.settings-row select {
+  background: var(--input);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 0;
+}
+.settings-form hr { border: none; border-top: 1px solid var(--border); margin: 2px 0; }
+.sync-actions { display: flex; gap: 8px; }
+.sync-result {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  padding: 10px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  min-height: 24px;
+  max-height: 220px;
+  overflow: auto;
+}
+
 /* scrollbars */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); }

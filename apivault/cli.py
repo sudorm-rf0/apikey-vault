@@ -16,10 +16,13 @@ import argparse
 import json
 import os
 import shlex
+import shutil
 import sys
+import urllib.parse
 from pathlib import Path
 
 from apivault import __version__
+from apivault import sync as vault_sync
 from apivault.passwords import PasswordError, read_password
 from apivault.server import DEFAULT_TTL_SECONDS, serve
 from apivault.store import (
@@ -103,6 +106,14 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_password_opts(p)
 
     # export / import for moving the (encrypted) vault between devices
+    p = sub.add_parser("sync", help="sync the encrypted vault via a git repository (multi-device)")
+    p.add_argument("action", choices=["push", "pull", "status"], help="push uploads; pull downloads; status reports divergence")
+    p.add_argument("--repo", metavar="URL", help="git repository URL (default: $APIVAULT_SYNC_REPO)")
+    p.add_argument("--yes", action="store_true", help="skip confirmation for pull")
+    _add_password_opts(p)
+
+    sub.add_parser("doctor", help="run environment diagnostics")
+
     p = sub.add_parser("export", help="export the encrypted vault to a file (safe to move between devices)")
     p.add_argument("file", help="output file path")
     _add_password_opts(p)
@@ -333,6 +344,130 @@ def _cmd_change_password(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_sync(args: argparse.Namespace) -> int:
+    repo = args.repo or vault_sync.default_repo()
+    if not repo:
+        _eprint("error: no sync repo; pass --repo <url> or set APIVAULT_SYNC_REPO")
+        return 1
+    store = VaultStore(args.dir)
+
+    if args.action == "push":
+        try:
+            password = _get_password(args)
+            store.unlock(password)
+            data = store.export_bytes()
+            store.lock()
+        except (VaultError, ValueError, PasswordError) as exc:
+            _eprint(f"error: {exc}")
+            return 1
+        try:
+            result = vault_sync.push(store.dir, repo, data)
+        except vault_sync.SyncError as exc:
+            _eprint(f"error: {exc}")
+            return 1
+        _eprint(f"sync push: {result}")
+        return 0
+
+    if args.action == "pull":
+        if not args.yes:
+            try:
+                answer = input(f"replace local vault from {repo}? [y/N] ").strip().lower()
+            except EOFError:
+                answer = "n"
+            if answer not in ("y", "yes"):
+                _eprint("aborted")
+                return 1
+        try:
+            path = vault_sync.pull(store.dir, repo)
+        except vault_sync.SyncError as exc:
+            _eprint(f"error: {exc}")
+            return 1
+        if path is None:
+            _eprint("nothing to pull (repo has no vault yet)")
+            return 0
+        try:
+            store.import_bytes(path.read_bytes())
+        except (VaultError, ValueError) as exc:
+            _eprint(f"error: {exc}")
+            return 1
+        _eprint(f"pulled from {repo}; local vault replaced (backup kept) — unlock with its master password")
+        return 0
+
+    # status
+    try:
+        info = vault_sync.status(store.dir, repo)
+    except vault_sync.SyncError as exc:
+        _eprint(f"error: {exc}")
+        return 1
+    print(f"repo:          {info['repo']}")
+    print(f"worktree:      {info['worktree']}")
+    print(f"local commit:  {info['local_commit'][:12] if info['local_commit'] else '(none)'}")
+    print(f"remote commit: {info['remote_commit'][:12] if info['remote_commit'] else '(none)'}")
+    print(f"ahead/behind:  {info['ahead']}/{info['behind']}")
+    print(f"remote vault:  {'yes' if info['has_remote_vault'] else 'no'}")
+    return 0
+
+
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    import platform
+    import sqlite3
+
+    results: list[tuple[str, str]] = []
+    ok = True
+
+    def check(name: str, passed: bool, detail: str = "", warn: bool = False) -> None:
+        nonlocal ok
+        status = "ok" if passed else ("warn" if warn else "FAIL")
+        results.append((name, status))
+        if not passed and not warn:
+            ok = False
+        if detail:
+            results.append(("", "  " + detail))
+
+    check("python", True, f"{platform.python_version()} ({platform.machine()})")
+    try:
+        import cryptography
+
+        check("cryptography", True, cryptography.__version__)
+    except Exception as exc:
+        check("cryptography", False, str(exc))
+
+    git = shutil.which("git")
+    check("git", git is not None, git or "not found in PATH")
+
+    store = VaultStore(args.dir)
+    check("vault path", True, str(store.path))
+    if store.initialized:
+        try:
+            mode = os.stat(store.path).st_mode & 0o777
+            check("vault exists", True)
+            check("vault perms 0600", mode == 0o600, f"actual {oct(mode)}")
+        except OSError as exc:
+            check("vault exists", False, str(exc))
+    else:
+        check("vault initialized", False, "run `apivault init`")
+
+    repo = vault_sync.default_repo()
+    check("sync repo configured", repo is not None,
+          repo or "set APIVAULT_SYNC_REPO to enable multi-device sync", warn=True)
+
+    try:
+        con = sqlite3.connect(f"file:{urllib.parse.quote(str(store.path))}?mode=ro", uri=True)
+        con.close()
+        check("vault readable", True)
+    except Exception as exc:
+        check("vault readable", False, str(exc))
+
+    print(f"{'CHECK':<20} RESULT")
+    print("-" * 60)
+    for name, status in results:
+        if name:
+            print(f"{name:<20} {status}")
+        else:
+            print(f"{'':<20} {status}")
+    return 0 if ok else 1
+
+
 def _cmd_export(args: argparse.Namespace) -> int:
     try:
         store = _unlock_store(args)
@@ -419,6 +554,8 @@ COMMANDS = {
     "rename": _cmd_rename,
     "export-env": _cmd_export_env,
     "change-password": _cmd_change_password,
+    "sync": _cmd_sync,
+    "doctor": _cmd_doctor,
     "export": _cmd_export,
     "import": _cmd_import,
     "serve": _cmd_serve,

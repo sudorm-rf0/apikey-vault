@@ -15,7 +15,10 @@ SQLite 中：人类用**图形界面或 CLI** 管理，Agent 用 CLI 或本地 H
 - **人类 CLI**：`store` / `get` / `list` / `delete` / `rename` / `export-env` / `change-password` / `export` / `import`。
 - **Agent HTTP API**：`apivault serve` 启动本地 REST 服务，Bearer Token 鉴权，默认只监听 `127.0.0.1`。
 - **多端可用**：`--host 0.0.0.0` 后同一局域网内手机/电脑浏览器直接访问 GUI；加密 vault 文件可
-  导出/导入到任意设备（密文传输，安全）。
+  导出/导入到任意设备（密文传输，安全）；**Git 多端同步**（`apivault sync push|pull|status`，
+  通过私有 Git 仓库同步加密 `vault.db`，GUI 内一键推送/拉取）。
+- **双语界面**：Web GUI 内置 简体中文 / English 切换（设置面板），含自动锁定时长、
+  同步仓库配置。
 - **原生 macOS 独立端（Apple 设计）**：SwiftUI 应用，遵循苹果设计语言（系统材质、
   Liquid Glass、自适应深/浅色、原生分栏与工具栏）；内嵌 Python 加密后端，双击即用。
 - **独立端（Web 版）**：`apivault serve --open` 一键打开浏览器 GUI；
@@ -150,6 +153,29 @@ curl -s http://127.0.0.1:8417/v1/keys/OPENAI_API_KEY \
 
 详细 API 见 [docs/API.md](docs/API.md)。
 
+## 🔄 多端同步（Git）
+
+把加密的 `vault.db` 提交到**私有** Git 仓库（例如 GitHub private repo），即可在
+多台设备间同步密钥库——因为文件是密文，仓库里任何人都读不到内容，只有主密码能解开。
+
+```bash
+# 推送到仓库（需先解锁）
+apivault sync push --repo git@github.com:you/vault-sync.git
+# 在另一台设备拉取（自动备份本地旧库）
+apivault sync pull --repo git@github.com:you/vault-sync.git
+# 查看两端差异
+apivault sync status --repo git@github.com:you/vault-sync.git
+```
+
+也可以设置环境变量 `APIVAULT_SYNC_REPO` 免去每次传参；Web GUI 的设置面板里配置
+仓库地址后可直接点 Push / Pull / Status。冲突策略：以本机为准（last writer wins）。
+
+## 🛠️ 诊断
+
+```bash
+apivault doctor    # 检查 Python/加密库/git/vault 状态与权限/同步配置
+```
+
 ## 🗂️ 数据存放
 
 默认目录 `~/.apikey-vault/vault.db`，可用环境变量 `APIVAULT_DIR` 覆盖，或给每个命令加
@@ -189,6 +215,8 @@ ChatGPT、Claude 等 AI 对话输入框）拦截常见 API 密钥格式：
   `{{vault:KEY_NAME}}`，AI 可用 `apivault get KEY_NAME` 安全取用。
 
 安装（Chrome/Edge 开发者模式 → 加载已解压的扩展程序 → 选择 `extension/` 目录）。
+分发给他人可用 `./scripts/package_extension.sh` 打包成 `dist/apikey-vault-guard.zip`
+（也可直接上传 Chrome Web Store / Edge Add-ons）。
 
 ![Key Guard 拦截示例](docs/screenshot-guard.png)
 

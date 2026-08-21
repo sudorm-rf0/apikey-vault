@@ -49,14 +49,14 @@
     <header class="topbar">
       <div class="brand">
         <svg class="brand-mark" aria-hidden="true"><use href="#i-key"/></svg>
-        <span class="brand-name">apikey-vault</span>
+        <span class="brand-name" data-i18n="appName">apikey-vault</span>
         <span class="version" id="version">v0.1.0</span>
       </div>
       <div class="status">
         <span class="led" id="lock-led"></span>
-        <span id="lock-label" class="lock-label">LOCKED</span>
+        <span id="lock-label" class="lock-label" data-i18n="locked">LOCKED</span>
         <span class="sep">/</span>
-        <span id="vault-path" class="muted"></span>
+        <span id="vault-path" class="muted" data-i18n="vaultPath"></span>
       </div>
     </header>
 
@@ -65,20 +65,20 @@
       <section id="init-screen" class="screen" hidden>
         <div class="unlock-box">
           <div class="unlock-glyph"><svg aria-hidden="true"><use href="#i-key"/></svg></div>
-          <h1>Initialize vault</h1>
-          <p class="muted">No vault found yet. Create one with a master password — every key is encrypted with it and nothing is stored in plain text.</p>
+          <h1 data-i18n="initTitle">Initialize vault</h1>
+          <p class="muted" data-i18n="initHint"></p>
 
           <form id="init-form" autocomplete="off">
             <div class="init-fields">
               <div>
-                <label for="init-password">Master password</label>
+                <label for="init-password" data-i18n="initPassword">Master password</label>
                 <input type="password" id="init-password" autocomplete="new-password" spellcheck="false">
               </div>
               <div>
-                <label for="init-confirm">Confirm master password</label>
+                <label for="init-confirm" data-i18n="initConfirm">Confirm master password</label>
                 <input type="password" id="init-confirm" autocomplete="new-password" spellcheck="false">
               </div>
-              <button type="submit" class="primary block">Create vault</button>
+              <button type="submit" class="primary block" data-i18n="createVault">Create vault</button>
             </div>
           </form>
 
@@ -90,24 +90,24 @@
       <section id="unlock-screen" class="screen">
         <div class="unlock-box">
           <div class="unlock-glyph"><svg aria-hidden="true"><use href="#i-lock"/></svg></div>
-          <h1>Vault locked</h1>
-          <p class="muted">Enter the master password to unlock this vault.</p>
+          <h1 data-i18n="lockedTitle">Vault locked</h1>
+          <p class="muted" id="unlock-hint" data-i18n="unlockHint">Enter the master password to unlock this vault.</p>
 
           <form id="unlock-form" autocomplete="off">
-            <label for="unlock-password">Master password</label>
+            <label for="unlock-password" data-i18n="masterPassword">Master password</label>
             <div class="field-row">
               <input type="password" id="unlock-password" autocomplete="current-password" autofocus spellcheck="false">
-              <button type="submit" class="primary">Unlock</button>
+              <button type="submit" class="primary" data-i18n="unlock">Unlock</button>
             </div>
           </form>
 
-          <button type="button" id="token-mode-btn" class="link">Use a bearer token instead</button>
+          <button type="button" id="token-mode-btn" class="link" data-i18n="useToken">Use a bearer token instead</button>
 
           <form id="token-form" hidden autocomplete="off">
-            <label for="token-input">Bearer token</label>
+            <label for="token-input" data-i18n="bearerToken">Bearer token</label>
             <div class="field-row">
               <input type="password" id="token-input" autocomplete="off" spellcheck="false">
-              <button type="submit" class="primary">Connect</button>
+              <button type="submit" class="primary" data-i18n="connect">Connect</button>
             </div>
             <p class="hint muted">Static token from <code>apivault serve --token</code>, or a token returned by <code>/v1/unlock</code>.</p>
           </form>
@@ -121,10 +121,10 @@
         <div class="layout">
           <aside class="sidebar">
             <div class="sidebar-head">
-              <h2>Key library</h2>
+              <h2 data-i18n="keyLibrary">Key library</h2>
               <span id="key-count" class="count">0</span>
             </div>
-            <input type="search" id="key-filter" placeholder="Filter keys" autocomplete="off" spellcheck="false">
+            <input type="search" id="key-filter" data-i18n-placeholder="filterKeys" placeholder="Filter keys" autocomplete="off" spellcheck="false">
             <ul id="key-list"></ul>
             <button id="add-key-btn" class="primary block">
               <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
@@ -136,36 +136,36 @@
             <!-- quick paste box: paste NAME=value lines or a single value -->
             <div id="paste-box" class="panel" hidden>
               <div class="paste-head">
-                <h2>Paste a key</h2>
-                <span class="muted hint">one or more <code>NAME=value</code> lines, or a single value</span>
+                <h2 data-i18n="pasteTitle">Paste a key</h2>
+                <span class="muted hint" data-i18n="pasteHint">one or more <code>NAME=value</code> lines, or a single value</span>
               </div>
               <textarea id="paste-input" rows="3" spellcheck="false" autocomplete="off"
                 placeholder="OPENAI_API_KEY=sk-...&#10;ANTHROPIC_API_KEY=sk-ant-...&#10;GITHUB_TOKEN=ghp_..."></textarea>
               <div class="paste-extra">
-                <input type="text" id="paste-name" placeholder="Key name (needed for a bare value)" spellcheck="false" autocomplete="off">
-                <input type="text" id="paste-desc" placeholder="Description (optional)" spellcheck="false" autocomplete="off">
+                <input type="text" id="paste-name" data-i18n-placeholder="pasteNamePh" placeholder="Key name (needed for a bare value)" spellcheck="false" autocomplete="off">
+                <input type="text" id="paste-desc" data-i18n-placeholder="pasteDescPh" placeholder="Description (optional)" spellcheck="false" autocomplete="off">
               </div>
               <div class="paste-actions">
-                <button id="paste-save" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Save keys</button>
-                <button id="paste-clear" class="ghost">Clear</button>
+                <button id="paste-save" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span data-i18n="saveKeys">Save keys</span></button>
+                <button id="paste-clear" class="ghost" data-i18n="clear">Clear</button>
                 <span id="paste-status" class="muted"></span>
               </div>
             </div>
 
             <div id="empty-detail" class="empty">
               <svg class="icon big muted" aria-hidden="true"><use href="#i-key"/></svg>
-              <p id="empty-text">No keys yet — add one.</p>
+              <p id="empty-text" data-i18n="noKeysYet">No keys yet — add one.</p>
             </div>
 
             <div id="key-detail" hidden>
               <div class="detail-head">
                 <h2 id="detail-name"></h2>
                 <div class="detail-actions">
-                  <button id="copy-btn" title="Copy a safe placeholder {{NAME}}"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy</button>
-                  <button id="copy-plain-btn" class="warn" title="Copy the real key — for trusted locations only"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Plaintext…</button>
-                  <button id="reveal-btn"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span id="reveal-label">Reveal</span></button>
-                  <button id="rename-btn">Rename</button>
-                  <button id="delete-btn" class="danger"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button>
+                  <button id="copy-btn" title="Copy a safe placeholder {{NAME}}"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copy</span></button>
+                  <button id="copy-plain-btn" class="warn" title="Copy the real key — for trusted locations only"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copyPlain">Plaintext…</span></button>
+                  <button id="reveal-btn"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span id="reveal-label" data-i18n="reveal">Reveal</span></button>
+                  <button id="rename-btn" data-i18n="rename">Rename</button>
+                  <button id="delete-btn" class="danger"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg><span data-i18n="delete">Delete</span></button>
                 </div>
               </div>
 
@@ -173,12 +173,12 @@
                 <code id="detail-value"></code>
                 <button id="reveal-inline" class="ghost" title="Reveal">Reveal</button>
               </div>
-              <p id="reveal-warning" class="warn-line" hidden>Plaintext shown on screen — never paste it into an AI chat.</p>
+              <p id="reveal-warning" class="warn-line" data-i18n="revealWarning" hidden>Plaintext shown on screen — never paste it into an AI chat.</p>
 
               <dl class="meta">
-                <div><dt>Description</dt><dd id="detail-desc"></dd></div>
-                <div><dt>Created</dt><dd id="detail-created"></dd></div>
-                <div><dt>Updated</dt><dd id="detail-updated"></dd></div>
+                <div><dt data-i18n="description">Description</dt><dd id="detail-desc"></dd></div>
+                <div><dt data-i18n="created">Created</dt><dd id="detail-created"></dd></div>
+                <div><dt data-i18n="updated">Updated</dt><dd id="detail-updated"></dd></div>
               </dl>
             </div>
 
@@ -209,12 +209,14 @@
     </main>
 
     <footer class="statusbar">
-      <span id="status-text" class="status-text">Ready.</span>
+      <span id="status-text" class="status-text" data-i18n="ready">Ready.</span>
       <span class="spacer"></span>
-      <button id="change-pw-btn" hidden>Change password</button>
-      <button id="export-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Export vault</button>
-      <button id="import-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>Import vault</button>
-      <button id="lock-btn" class="danger" hidden><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Lock</button>
+      <button id="change-pw-btn" hidden data-i18n="changePassword">Change password</button>
+      <button id="export-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span data-i18n="exportVault">Export vault</span></button>
+      <button id="import-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span data-i18n="importVault">Import vault</span></button>
+      <button id="sync-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span data-i18n="sync">Sync</span></button>
+      <button id="settings-btn" hidden><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg><span data-i18n="settings">Settings</span></button>
+      <button id="lock-btn" class="danger" hidden><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span data-i18n="lock">Lock</span></button>
       <input type="file" id="import-file" accept=".db,application/octet-stream" hidden>
     </footer>
   </div>
@@ -227,6 +229,7 @@
     </div>
   </div>
 
+  <script src="/app/i18n.js"></script>
   <script src="/app/app.js"></script>
 </body>
 </html>
