@@ -16,8 +16,10 @@ SQLite 中：人类用**图形界面或 CLI** 管理，Agent 用 CLI 或本地 H
 - **Agent HTTP API**：`apivault serve` 启动本地 REST 服务，Bearer Token 鉴权，默认只监听 `127.0.0.1`。
 - **多端可用**：`--host 0.0.0.0` 后同一局域网内手机/电脑浏览器直接访问 GUI；加密 vault 文件可
   导出/导入到任意设备（密文传输，安全）。
-- **独立端**：`apivault serve --open` 一键打开 GUI；`scripts/build_app.sh` 可打包为 macOS
-  独立 `.app`（内嵌 Python 环境，无需预装依赖）。
+- **原生 macOS 独立端（Apple 设计）**：SwiftUI 应用，遵循苹果设计语言（系统材质、
+  Liquid Glass、自适应深/浅色、原生分栏与工具栏）；内嵌 Python 加密后端，双击即用。
+- **独立端（Web 版）**：`apivault serve --open` 一键打开浏览器 GUI；
+  `scripts/build_app.sh` 可打包 `apikey-vault-web.app`（内嵌 Python 环境）。
 - **安全细节**：每条密钥独立 nonce；会话 Token 内存中只存 SHA-256 摘要并带 TTL；
   `/v1/unlock` 失败限速；响应 `Cache-Control: no-store` + CSP；vault 文件权限 0600。
 - **极简依赖**：运行时仅依赖 `cryptography`，HTTP 服务与 GUI 用 Python 标准库 + 原生 JS。
@@ -28,6 +30,8 @@ SQLite 中：人类用**图形界面或 CLI** 管理，Agent 用 CLI 或本地 H
 ![密钥库（含粘贴输入框）](docs/screenshot-unlocked.png)
 ![密钥详情](docs/screenshot-detail.png)
 ![粘贴密钥](docs/screenshot-paste.png)
+
+> 原生 macOS App 使用相同的加密后端与界面流程（SwiftUI 实现，遵循 Apple HIG / Liquid Glass）。
 
 ## 📦 安装
 
@@ -59,14 +63,23 @@ apivault serve --host 0.0.0.0 --port 8417 --token <你的agent令牌>
 输入令牌即可连接（保险库解锁后可用）。注意：`--host 0.0.0.0` 会把服务暴露到局域网，
 务必使用强令牌，且仅限可信网络。
 
-### 独立 App（macOS）
+### 原生 macOS App（Apple 设计）
+
+用 SwiftUI + 苹果设计语言构建的原生应用：系统材质与 Liquid Glass、自适应深/浅色、
+原生分栏密钥库与工具栏；内嵌 Python 加密后端，双击即用，无需预装任何依赖。
 
 ```bash
-./scripts/build_app.sh        # 生成 dist/apikey-vault.app（内嵌 Python，无需预装依赖）
-open dist/apikey-vault.app    # 双击即启动，自动打开浏览器
+./script/build_and_run.sh          # 编译并启动 dist/apikey-vault.app
+./script/build_and_run.sh --verify # 启动并确认进程存活
+open dist/apikey-vault.app         # 之后直接双击启动
 ```
 
-日志在 `~/.apikey-vault/app.log`。
+- 首启显示「Initialize vault」创建保险库，之后每次输入主密码解锁。
+- 支持粘贴多行 `NAME=value` 密钥、显示/复制、改密、加密导出/导入。
+- 数据与 CLI 共用 `~/.apikey-vault`；后端日志在 `~/.apikey-vault/app.log`。
+
+> 需要 Xcode 工具链（`xcode-select --install`）。Web 版打包请用
+> `./scripts/build_app.sh`（生成 `dist/apikey-vault-web.app`）。
 
 ## 🚀 快速开始（CLI）
 

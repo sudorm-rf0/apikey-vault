@@ -201,3 +201,27 @@ apikey-vault/
 静态 GUI 服务与路径穿越、静态 Token 跨 Lock 存活、CLI export/import 端到端。
 GUI 通过真实 Chrome（playwright-core）做了端到端验证：首启初始化 → 解锁 →
 增删改查 → 显示/复制 → 改密 → 导出 → 锁定，控制台零报错。
+
+
+---
+
+## 10. v0.3 更新：原生 macOS App（Apple 设计）
+
+用 `build-macos-apps` 技能包（swiftui-patterns / liquid-glass / build-run-debug）
+构建原生 SwiftUI 独立端：
+
+- **工程**：`macos/Package.swift`，三个 target：
+  - `APIVaultCore`：Swift 服务层（`APIClient` actor、`BackendManager` 进程托管）；
+  - `APIVaultApp`：SwiftUI 界面（App/Views/Support 按职责拆分）；
+  - `SelfTest`：无 UI 端到端自检（真实拉起 Python 后端，跑完整 API 往返）。
+- **设计**（遵循 liquid-glass）：`NavigationSplitView` 分栏 + 系统材质、工具栏原生按钮
+  与 Menu 分组、`searchable` 挂载在分栏层、解锁/初始化用系统材质卡片（macOS 26 自动获得
+  Liquid Glass 系统外观）、自适应深/浅色，未手搓任何系统组件。
+- **后端**：App 启动时自动拉起内嵌 Python venv 的 `apivault serve`（健康检查通过后连接；
+  已运行则直接复用），退出时终止子进程；日志写 `~/.apikey-vault/app.log`。
+- **功能**：首启初始化、主密码/Bearer Token 解锁、密钥库（搜索/过滤）、单条表单或
+  多行 `NAME=value` 粘贴输入、显示/隐藏（60s 自动隐藏）、一键复制、重命名、删除、
+  改密、加密导出/导入。
+- **验证**：`apikey-vault-selftest` 全链路 SELFTEST OK（init→CRUD→改密→锁定→旧密码
+  拒绝→删除→导出/导入往返）；`script/build_and_run.sh --verify` 确认 .app 启动并
+  自动拉起后端（健康检查 OK）。

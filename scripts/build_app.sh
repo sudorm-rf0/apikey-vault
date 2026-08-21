@@ -8,12 +8,12 @@
 # Usage:
 #   ./scripts/build_app.sh [PORT]          (default port 8417)
 #
-# Output: dist/apikey-vault.app
+# Output: dist/apikey-vault-web.app (web-GUI bundle; the native app is built by script/build_and_run.sh)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-APP_NAME="apikey-vault"
+APP_NAME="apikey-vault-web"
 DIST="$ROOT/dist"
 APP="$DIST/$APP_NAME.app"
 PORT="${1:-8417}"
