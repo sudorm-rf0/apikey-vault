@@ -111,3 +111,56 @@ def test_verify_password(store):
     # still works while unlocked
     assert store.unlocked
     assert store.verify_password("master-pw") is True
+
+
+def test_import_creates_backup(tmp_path):
+    s = VaultStore(tmp_path)
+    s.initialize("pw")
+    s.unlock("pw")
+    s.set("PRECIOUS", "value-1")
+    s.close()
+
+    # build a second vault to import
+    other = VaultStore(tmp_path / "other")
+    other.initialize("pw2")
+    other.unlock("pw2")
+    other.set("NEW", "value-2")
+    blob = other.export_bytes()
+    other.close()
+
+    s2 = VaultStore(tmp_path)
+    s2.import_bytes(blob)
+    backups = list(tmp_path.glob("vault.db.backup-*"))
+    assert len(backups) == 1
+    # the backup is the OLD vault (encrypted, valid sqlite)
+    raw = backups[0].read_bytes()
+    assert raw[:16] == b"SQLite format 3\x00"
+    assert b"value-1" not in raw
+
+    # the imported vault works
+    s2.unlock("pw2")
+    assert s2.get("NEW") == "value-2"
+    s2.close()
+
+
+def test_import_with_spaces_in_path(tmp_path):
+    weird = tmp_path / "vault with spaces"
+    s = VaultStore(weird)
+    s.initialize("pw")
+    s.unlock("pw")
+    s.set("K", "v")
+    blob = s.export_bytes()
+    s.close()
+
+    target = tmp_path / "another dir with spaces"
+    t = VaultStore(target)
+    t.initialize("pwA")
+    t.unlock("pwA")
+    t.set("OLD", "x")
+    t.close()
+
+    t2 = VaultStore(target)
+    t2.import_bytes(blob)  # should not raise despite spaces in path
+    t2.unlock("pw")
+    assert t2.get("K") == "v"
+    t2.close()

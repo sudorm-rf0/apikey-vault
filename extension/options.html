@@ -25,6 +25,9 @@
   </div>
   <p class="hint">When enabled, a redacted key is replaced with <code>{{vault:NAME}}</code> if it matches a key in your local vault (requires <code>apivault serve</code>).</p>
 
+  <label for="vaultUrl">Vault server URL</label>
+  <input type="text" id="vaultUrl" autocomplete="off" placeholder="http://127.0.0.1:8417">
+
   <label for="vaultToken">Bearer token (optional, from <code>apivault serve --token …</code>)</label>
   <input type="password" id="vaultToken" autocomplete="off" placeholder="leave empty if the server is not token-protected">
 

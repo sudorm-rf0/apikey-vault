@@ -27,10 +27,40 @@ final class AppState: ObservableObject {
     let backend: BackendManager
     let api: APIClient
 
+    /// Auto-lock after this many seconds of inactivity.
+    private let autoLockSeconds: TimeInterval = 15 * 60
+    private var lastActivity = Date()
+    private var idleTimer: Timer?
+
     init() {
         let backend = BackendManager()
         self.backend = backend
         self.api = APIClient(baseURL: backend.baseURL)
+        startIdleMonitor()
+    }
+
+    /// Watches keyboard/mouse activity inside the app and locks after the idle
+    /// timeout, so an unlocked vault never stays open unattended.
+    private func startIdleMonitor() {
+        NSEvent.addLocalMonitorForEvents(
+            matching: [.keyDown, .leftMouseDown, .rightMouseDown, .scrollWheel]
+        ) { [weak self] event in
+            Task { @MainActor in
+                self?.lastActivity = Date()
+            }
+            return event
+        }
+        idleTimer?.invalidate()
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                if self.phase == .unlocked,
+                   Date().timeIntervalSince(self.lastActivity) > self.autoLockSeconds {
+                    await self.lock()
+                    self.notice = "Auto-locked after 15 minutes of inactivity."
+                }
+            }
+        }
     }
 
     var filteredKeys: [KeyMeta] {

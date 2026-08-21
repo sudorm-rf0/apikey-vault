@@ -83,6 +83,28 @@
     return el.isContentEditable ? el.textContent || "" : el.value || "";
   }
 
+  // Insert text at the current caret/selection (textarea/input/contenteditable).
+  function insertAtCursor(el, text) {
+    if (el.isContentEditable) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(text));
+        range.collapse(false);
+      } else {
+        el.textContent = (el.textContent || "") + text;
+      }
+      return;
+    }
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const next = el.value.slice(0, start) + text + el.value.slice(end);
+    el.value = next;
+    const pos = start + text.length;
+    el.setSelectionRange(pos, pos);
+  }
+
   function placeCaretAtEnd(el) {
     try {
       if (el.isContentEditable) {
@@ -110,9 +132,7 @@
     event.stopPropagation();
 
     const redacted = await redactWithVault(text);
-    const current = getElementValue(el);
-    setElementValue(el, current + redacted);
-    placeCaretAtEnd(el);
+    insertAtCursor(el, redacted);
     el.dispatchEvent(new Event("input", { bubbles: true }));
     showToast(
       "Pasted API key was blocked" +

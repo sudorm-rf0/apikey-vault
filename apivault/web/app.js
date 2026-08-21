@@ -18,6 +18,27 @@ const state = {
 let statusTimer = null;
 let revealTimer = null;
 
+// Auto-lock after inactivity so an unlocked vault does not stay open forever.
+const AUTO_LOCK_MS = 15 * 60 * 1000;
+let lastActivity = Date.now();
+let idleTimer = null;
+
+function resetIdle() {
+  lastActivity = Date.now();
+}
+
+function startIdleMonitor() {
+  ["mousemove", "mousedown", "keydown", "scroll", "touchstart"].forEach((ev) =>
+    document.addEventListener(ev, resetIdle, { passive: true })
+  );
+  clearInterval(idleTimer);
+  idleTimer = setInterval(() => {
+    if (state.unlocked && Date.now() - lastActivity > AUTO_LOCK_MS) {
+      onLock("Auto-locked after 15 minutes of inactivity.");
+    }
+  }, 30000);
+}
+
 /* ------------------------------------------------------------ API client */
 async function api(method, path, opts = {}) {
   const headers = { ...(opts.headers || {}) };
@@ -683,12 +704,12 @@ async function onTokenConnect(e) {
   }
 }
 
-async function onLock() {
+async function onLock(message = "Vault locked.") {
   await api("POST", "/v1/lock", { noAuthReset: true });
   sessionStorage.removeItem("apivault_token");
   state.token = null;
   setLocked(true);
-  setStatus("Vault locked.");
+  setStatus(message);
 }
 
 /* -------------------------------------------------------------- init */
@@ -781,5 +802,6 @@ function wire() {
 
 document.addEventListener("DOMContentLoaded", () => {
   wire();
+  startIdleMonitor();
   init();
 });

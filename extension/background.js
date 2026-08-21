@@ -2,9 +2,6 @@
 // user has enabled vault integration (options page). Uses the extension's own
 // origin so it is not subject to page CORS.
 
-const API_ROOT = "http://127.0.0.1:8417";
-let cache = { names: null, at: 0 };
-
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "guard:resolve") {
     resolveKey(msg.value)
@@ -14,35 +11,43 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
 });
 
-async function resolveKey(value) {
-  const settings = await chrome.storage.sync.get({
+async function settings() {
+  return chrome.storage.sync.get({
     vaultEnabled: false,
     vaultToken: "",
+    vaultUrl: "http://127.0.0.1:8417",
   });
-  if (!settings.vaultEnabled) return null;
+}
 
-  const names = await listNames(settings.vaultToken);
+async function resolveKey(value) {
+  const cfg = await settings();
+  if (!cfg.vaultEnabled) return null;
+
+  const names = await listNames(cfg);
   for (const name of names) {
-    const stored = await getValue(name, settings.vaultToken);
+    const stored = await getValue(name, cfg);
     if (stored === value) return name;
   }
   return null;
 }
 
-async function listNames(token) {
-  const res = await fetch(`${API_ROOT}/v1/keys`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+function apiRoot(cfg) {
+  return cfg.vaultUrl.replace(/\/$/, "");
+}
+
+async function listNames(cfg) {
+  const res = await fetch(`${apiRoot(cfg)}/v1/keys`, {
+    headers: cfg.vaultToken ? { Authorization: `Bearer ${cfg.vaultToken}` } : {},
   });
   if (!res.ok) throw new Error(`list keys failed: ${res.status}`);
   const data = await res.json();
   return (data.keys || []).map((k) => k.name);
 }
 
-async function getValue(name, token) {
-  const res = await fetch(
-    `${API_ROOT}/v1/keys/${encodeURIComponent(name)}`,
-    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-  );
+async function getValue(name, cfg) {
+  const res = await fetch(`${apiRoot(cfg)}/v1/keys/${encodeURIComponent(name)}`, {
+    headers: cfg.vaultToken ? { Authorization: `Bearer ${cfg.vaultToken}` } : {},
+  });
   if (!res.ok) return null;
   const data = await res.json();
   return data.value;

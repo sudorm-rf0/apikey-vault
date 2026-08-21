@@ -21,7 +21,9 @@ SQLite 中：人类用**图形界面或 CLI** 管理，Agent 用 CLI 或本地 H
 - **独立端（Web 版）**：`apivault serve --open` 一键打开浏览器 GUI；
   `scripts/build_app.sh` 可打包 `apikey-vault-web.app`（内嵌 Python 环境）。
 - **安全细节**：每条密钥独立 nonce；会话 Token 内存中只存 SHA-256 摘要并带 TTL；
-  `/v1/unlock` 失败限速；响应 `Cache-Control: no-store` + CSP；vault 文件权限 0600。
+  `/v1/unlock` 失败限速；响应 `Cache-Control: no-store` + CSP；vault 文件权限 0600；
+  **无操作 15 分钟自动锁定**（Web GUI 与原生 App）；**导入前自动备份旧 vault**
+  （保留最近 5 份 `vault.db.backup-*`）。
 - **极简依赖**：运行时仅依赖 `cryptography`，HTTP 服务与 GUI 用 Python 标准库 + 原生 JS。
 
 ## 📸 界面预览
@@ -169,6 +171,7 @@ curl -s http://127.0.0.1:8417/v1/keys/OPENAI_API_KEY \
   并提示「切勿粘贴进 AI 对话框」。
 - **原生 App 额外自动清空**：明文复制后 30 秒自动清空剪贴板。
 - **屏幕明文警示**：Reveal 显示真实值时，界面显示橙色警告条。
+- **无操作自动锁定**：解锁后 15 分钟无操作，Web GUI 与原生 App 都会自动锁定。
 
 ### 2. 浏览器扩展（Chrome / Edge，MV3）
 
@@ -180,8 +183,9 @@ ChatGPT、Claude 等 AI 对话输入框）拦截常见 API 密钥格式：
   JWT 形态 Token 等。
 - **粘贴即拦截**：检测到密钥的粘贴会被阻止并替换为 `{{REDACTED}}`，同时弹出警告；
 - **输入即脱敏**：手动输入密钥也会被实时脱敏；
-- **可选 vault 集成**：在扩展设置里启用「Resolve keys against the local vault」
-  并填入 `apivault serve --token` 的令牌后，匹配本地 vault 的密钥会被替换为
+- **可选 vault 集成**：在扩展设置里启用「Resolve keys against the local vault」、
+  填入 vault 服务地址（默认 `http://127.0.0.1:8417`，可改端口）与
+  `apivault serve --token` 的令牌后，匹配本地 vault 的密钥会被替换为
   `{{vault:KEY_NAME}}`，AI 可用 `apivault get KEY_NAME` 安全取用。
 
 安装（Chrome/Edge 开发者模式 → 加载已解压的扩展程序 → 选择 `extension/` 目录）。
@@ -204,11 +208,27 @@ ChatGPT、Claude 等 AI 对话输入框）拦截常见 API 密钥格式：
 ## ✅ 测试
 
 ```bash
+./script/test.sh        # Python 测试 + Key Guard 模式测试 + Swift 自检
+# 或单独运行：
 python -m pytest
+node tests/test_patterns.js
 ```
 
-覆盖密码学往返/篡改、存储 CRUD/改密/导出导入、CLI 端到端、HTTP API 全链路
-（含鉴权、限速、静态 GUI、首启初始化）。
+覆盖密码学往返/篡改、存储 CRUD/改密/导出导入（含导入自动备份）、CLI 端到端、
+HTTP API 全链路（含鉴权、限速、静态 GUI、首启初始化）、Key Guard 密钥模式、
+Swift 客户端↔真实后端往返。
+
+## 🛠️ 故障排查
+
+- **端口被占用**：原生 App 或 `apivault serve` 默认用 `8417`。如果 8417 已被其它
+  进程占用，原生 App 会连接已有服务（若其 vault 路径不同请注意）；CLI 用
+  `--port` 指定其它端口，扩展在设置里改「Vault server URL」。
+- **扩展在开发者模式加载后不生效**：新版 Chrome/Edge 会默认禁用命令行加载的扩展；
+  正式使用请通过 扩展管理 → 开发者模式 → 加载已解压的扩展程序 安装，并确认开关已开启。
+- **剪贴板/粘贴被系统拦截**：macOS 首次使用剪贴板或输入监控会请求权限，请在
+  系统设置 → 隐私与安全性 中允许。
+- **误导入后想恢复**：每次导入前会自动备份，恢复 `~/.apikey-vault/vault.db.backup-*`
+  中的文件即可（先停止服务再替换）。
 
 ## ⚠️ 注意事项
 

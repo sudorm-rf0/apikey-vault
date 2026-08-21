@@ -14,6 +14,7 @@ import sqlite3
 import tempfile
 import threading
 import time
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -448,6 +449,7 @@ class VaultStore:
                 _wipe(self._key)
                 self._key = None
 
+            self._backup_current()
             shutil.move(tmp_path, self.path)
             for suffix in ("-wal", "-shm"):
                 try:
@@ -456,11 +458,32 @@ class VaultStore:
                     pass
             self._chmod_private()
 
+    def _backup_current(self) -> None:
+        """Keep a timestamped encrypted backup of the current vault before an
+        import replaces it, so a bad import can never destroy the data."""
+        if not self.path.exists():
+            return
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        backup = self.dir / f"vault.db.backup-{stamp}"
+        try:
+            shutil.copy2(self.path, backup)
+            os.chmod(backup, 0o600)
+        except OSError:
+            return  # non-fatal; the import still proceeds
+        # keep only the 5 most recent backups
+        backups = sorted(self.dir.glob("vault.db.backup-*"))
+        for old_backup in backups[:-5]:
+            try:
+                old_backup.unlink()
+            except OSError:
+                pass
+
     @staticmethod
     def _validate_db_file(path: str) -> None:
         """Raise VaultError unless ``path`` looks like a valid vault database."""
         try:
-            con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            uri = "file:" + urllib.parse.quote(str(path)) + "?mode=ro"
+            con = sqlite3.connect(uri, uri=True)
         except sqlite3.Error as exc:
             raise VaultError(f"imported file is not a valid vault: {exc}") from exc
         try:

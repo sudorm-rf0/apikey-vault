@@ -43,6 +43,9 @@ mkdir -p "$APP_MACOS" "$APP_CONTENTS/Resources"
 BUILD_BINARY="$(swift build -c release --show-bin-path)/$APP_NAME"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
+if [ -f "$MAC_DIR/Resources/AppIcon.icns" ]; then
+  cp "$MAC_DIR/Resources/AppIcon.icns" "$APP_CONTENTS/Resources/AppIcon.icns"
+fi
 
 cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -60,9 +63,11 @@ cat >"$INFO_PLIST" <<PLIST
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.2.0</string>
+  <string>0.5.0</string>
   <key>CFBundleVersion</key>
-  <string>0.2.0</string>
+  <string>0.5.0</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>LSMinimumSystemVersion</key>
   <string>$MIN_SYSTEM_VERSION</string>
   <key>NSPrincipalClass</key>
@@ -89,6 +94,9 @@ case "$MODE" in
   run)
     open_app
     echo "Launched $APP_BUNDLE"
+    ;;
+  build|--build)
+    echo "Built $APP_BUNDLE (not launched)"
     ;;
   --debug|debug)
     lldb -- "$APP_BINARY"
