@@ -89,6 +89,7 @@ async function setLocked(locked) {
     $("paste-name").value = "";
     $("paste-desc").value = "";
     $("paste-status").textContent = "";
+    $("reveal-warning").hidden = true;
     showPasteBox(false);
     $("unlock-password").focus();
   } else {
@@ -150,6 +151,7 @@ function selectKey(name) {
   $("detail-updated").textContent = key.updated_at;
   setRevealButton(false);
   setMasked();
+  $("reveal-warning").hidden = true;
   renderList();
 }
 
@@ -359,6 +361,7 @@ async function revealValue() {
     setMasked();
     state.revealed = false;
     setRevealButton(false);
+    $("reveal-warning").hidden = true;
     return;
   }
   const name = state.selected;
@@ -372,19 +375,47 @@ async function revealValue() {
   $("detail-value").textContent = value;
   state.revealed = true;
   setRevealButton(true);
+  $("reveal-warning").hidden = false;
   clearTimeout(revealTimer);
   revealTimer = setTimeout(() => {
     if (state.revealed) {
       setMasked();
       state.revealed = false;
       setRevealButton(false);
+      $("reveal-warning").hidden = true;
     }
   }, 60000);
 }
 
+// Safe copy: put a placeholder on the clipboard so the real key can never be
+// pasted into an AI chat by accident.
 async function copyValue() {
   const name = state.selected;
   if (!name) return;
+  const placeholder = "{{" + name + "}}";
+  const ok = await copyText(placeholder);
+  setStatus(
+    ok
+      ? `Copied placeholder ${placeholder} (safe). For the real value use “Plaintext…” — never paste keys into AI chats.`
+      : "Copy failed.",
+    ok ? "ok" : "error"
+  );
+}
+
+// Explicit, warned plaintext copy.
+async function copyPlaintext() {
+  const name = state.selected;
+  if (!name) return;
+  const confirmed = await showModal({
+    title: "Copy plaintext key",
+    body: `<p>The real value of <strong></strong> will be put on the clipboard. Never paste it into an AI chat — use the placeholder <code>{{name}}</code> instead.</p>`,
+    bodyName: name,
+    actions: [
+      { label: "Cancel" },
+      { label: "Copy plaintext", danger: true, value: true },
+    ],
+  });
+  if (!confirmed) return;
   const res = await api("GET", "/v1/keys/" + encodeURIComponent(name));
   if (res.status !== 200) {
     setStatus("Could not read value: " + (await safeError(res)), "error");
@@ -392,7 +423,12 @@ async function copyValue() {
   }
   const value = (await res.json()).value;
   const ok = await copyText(value);
-  setStatus(ok ? `Copied ${name} to clipboard.` : "Copy failed.", ok ? "ok" : "error");
+  setStatus(
+    ok
+      ? `Plaintext ${name} copied. ⚠ Do not paste it into AI chats — it stays on the clipboard until replaced.`
+      : "Copy failed.",
+    ok ? "error" : "error"
+  );
 }
 
 async function copyText(text) {
@@ -715,6 +751,7 @@ function wire() {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") onPasteSave();
   });
   $("copy-btn").addEventListener("click", copyValue);
+  $("copy-plain-btn").addEventListener("click", copyPlaintext);
   $("reveal-btn").addEventListener("click", () => revealValue());
   $("reveal-inline").addEventListener("click", () => revealValue());
   $("delete-btn").addEventListener("click", deleteSelected);

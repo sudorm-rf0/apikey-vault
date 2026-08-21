@@ -56,6 +56,9 @@ eval "$(apivault export-env)"
 
 - **不要把密钥写进对话/日志/补丁**：用 `$(apivault get NAME)` 在 shell 内捕获并注入环境，
   绝不在回复中回显密钥值。
+- **如果用户贴给你的是占位符（`{{NAME}}` / `{{REDACTED}}` / `{{vault:NAME}}`），
+  不要要求用户粘贴明文**：直接让用户运行 `apivault get <name>` 把值注入环境，
+  或使用本地 API（`apivault serve`）取用。这是产品防泄露设计的一部分。
 - **不要直接读 `vault.db`**：它是密文，读了也没用；请走 CLI 或 API。
 - `list` / `info` 只含元数据（名称、描述、时间），可以安全展示。
 - 找不到密钥时先 `apivault list` 看准确名称。

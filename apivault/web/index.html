@@ -161,7 +161,8 @@
               <div class="detail-head">
                 <h2 id="detail-name"></h2>
                 <div class="detail-actions">
-                  <button id="copy-btn"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy</button>
+                  <button id="copy-btn" title="Copy a safe placeholder {{NAME}}"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Copy</button>
+                  <button id="copy-plain-btn" class="warn" title="Copy the real key — for trusted locations only"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg>Plaintext…</button>
                   <button id="reveal-btn"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span id="reveal-label">Reveal</span></button>
                   <button id="rename-btn">Rename</button>
                   <button id="delete-btn" class="danger"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button>
@@ -172,6 +173,7 @@
                 <code id="detail-value"></code>
                 <button id="reveal-inline" class="ghost" title="Reveal">Reveal</button>
               </div>
+              <p id="reveal-warning" class="warn-line" hidden>Plaintext shown on screen — never paste it into an AI chat.</p>
 
               <dl class="meta">
                 <div><dt>Description</dt><dd id="detail-desc"></dd></div>

@@ -157,6 +157,42 @@ curl -s http://127.0.0.1:8417/v1/keys/OPENAI_API_KEY \
   - `payload = nonce(12B) || AES-256-GCM 密文 || tag(16B)`
 - `meta` 表：scrypt 盐、验证 blob、KDF 参数、版本
 
+## 🔒 Key Guard：防止密钥以明文进入 AI 对话框
+
+这个产品存在的意义：**密钥永远不应该以明文出现在 AI 对话框里**。三层防护：
+
+### 1. 界面层（Web GUI 与原生 App）
+
+- **复制默认给安全占位符**：点 Copy 复制的是 `{{OPENAI_API_KEY}}` 而不是真实值——
+  即使误粘贴进 AI 对话框，泄露的也只是占位符。
+- **明文复制需显式确认**：点 Plaintext… 会弹出警告，确认后才会复制真实密钥，
+  并提示「切勿粘贴进 AI 对话框」。
+- **原生 App 额外自动清空**：明文复制后 30 秒自动清空剪贴板。
+- **屏幕明文警示**：Reveal 显示真实值时，界面显示橙色警告条。
+
+### 2. 浏览器扩展（Chrome / Edge，MV3）
+
+`extension/` 目录是一个即装即用的浏览器扩展，会在**所有网页的输入框**（包括
+ChatGPT、Claude 等 AI 对话输入框）拦截常见 API 密钥格式：
+
+- 支持：`sk-`（OpenAI）、`sk-ant-`（Anthropic）、`ghp_`/`github_pat_`（GitHub）、
+  `AIza`（Google）、`xoxb-`（Slack）、`AKIA`（AWS）、`sk_live_`/`sk_test_`（Stripe）、
+  JWT 形态 Token 等。
+- **粘贴即拦截**：检测到密钥的粘贴会被阻止并替换为 `{{REDACTED}}`，同时弹出警告；
+- **输入即脱敏**：手动输入密钥也会被实时脱敏；
+- **可选 vault 集成**：在扩展设置里启用「Resolve keys against the local vault」
+  并填入 `apivault serve --token` 的令牌后，匹配本地 vault 的密钥会被替换为
+  `{{vault:KEY_NAME}}`，AI 可用 `apivault get KEY_NAME` 安全取用。
+
+安装（Chrome/Edge 开发者模式 → 加载已解压的扩展程序 → 选择 `extension/` 目录）。
+
+![Key Guard 拦截示例](docs/screenshot-guard.png)
+
+### 3. Agent 协作规范
+
+见 [AGENTS.md](AGENTS.md)：Agent 通过 `apivault get <name>` / `{{vault:NAME}}`
+占位符获取密钥，绝不要求用户在对话框粘贴明文。
+
 ## 🔒 安全模型
 
 - **威胁**：vault 文件被复制、磁盘丢失 → 无主密码无法还原任何密钥。

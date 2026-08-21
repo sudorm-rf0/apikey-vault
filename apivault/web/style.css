@@ -151,6 +151,8 @@ button.primary { background: var(--green); border-color: var(--green); color: #0
 button.primary:hover { background: #3CF29B; color: #04150B; }
 button.danger:hover { border-color: var(--red); color: var(--red); }
 button.ghost { border-color: var(--border); }
+button.warn:hover { border-color: var(--amber); color: var(--amber); }
+.warn-line { color: var(--amber); font-size: 11px; margin-top: 8px; }
 button.block { width: 100%; justify-content: center; }
 button.link { border: none; padding: 0; color: var(--muted); text-decoration: underline; }
 button.link:hover { color: var(--green); border: none; }

@@ -7,7 +7,9 @@ struct DetailView: View {
     @State private var value: String?
     @State private var editing = false
     @State private var confirmDelete = false
+    @State private var confirmPlaintext = false
     @State private var hideTimer: Timer?
+    @State private var clipboardTimer: Timer?
 
     private var selectedKey: KeyMeta? {
         guard let name = state.selection else { return nil }
@@ -36,6 +38,20 @@ struct DetailView: View {
             } message: {
                 Text("This cannot be undone.")
             }
+            .confirmationDialog(
+                "Copy plaintext key?",
+                isPresented: $confirmPlaintext,
+                titleVisibility: .visible
+            ) {
+                Button("Copy plaintext (clears in 30s)", role: .destructive) {
+                    if let key = selectedKey {
+                        copyPlaintext(key)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The real key will be put on the clipboard. Never paste it into an AI chat — the placeholder {{NAME}} is the safe choice.")
+            }
         } else {
             ContentUnavailableView(
                 "Select a key",
@@ -57,10 +73,17 @@ struct DetailView: View {
                 Label(revealed ? "Hide" : "Reveal", systemImage: revealed ? "eye.slash" : "eye")
             }
             Button {
-                copyValue(key)
+                copyPlaceholder(key)
             } label: {
                 Label("Copy", systemImage: "doc.on.doc")
             }
+            .help("Copy the safe placeholder {{NAME}} — never paste the real key into an AI chat")
+            Button {
+                confirmPlaintext = true
+            } label: {
+                Label("Plaintext…", systemImage: "doc.on.doc.fill")
+            }
+            .help("Copy the real key (warned) — trusted locations only")
             Button {
                 editing = true
             } label: {
@@ -75,16 +98,24 @@ struct DetailView: View {
     }
 
     private var valueBox: some View {
-        HStack {
-            Text(revealed ? (value ?? "") : String(repeating: "•", count: 24))
-                .font(.system(.body, design: .monospaced))
-                .textSelection(.enabled)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(revealed ? (value ?? "") : String(repeating: "•", count: 24))
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+            }
+            .padding(14)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            if revealed {
+                Label("Plaintext shown on screen — never paste it into an AI chat.", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
-        .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func metadata(_ key: KeyMeta) -> some View {
@@ -128,12 +159,30 @@ struct DetailView: View {
         }
     }
 
-    private func copyValue(_ key: KeyMeta) {
+    /// Safe copy: put `{{NAME}}` on the clipboard so the real key can never be
+    /// pasted into an AI chat by accident.
+    private func copyPlaceholder(_ key: KeyMeta) {
+        copyToPasteboard("{{\(key.name)}}")
+        state.notice = "Copied placeholder {{\(key.name)}}. Use Plaintext… only for trusted locations."
+    }
+
+    /// Warned plaintext copy; the clipboard is cleared again after 30 seconds.
+    private func copyPlaintext(_ key: KeyMeta) {
         Task {
             do {
                 let value = try await state.api.value(for: key.name)
                 copyToPasteboard(value)
-                state.notice = "Copied \(key.name) to clipboard."
+                clipboardTimer?.invalidate()
+                clipboardTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { _ in
+                    Task { @MainActor in
+                        if NSPasteboard.general.string(forType: .string) == value {
+                            NSPasteboard.general.clearContents()
+                            self.state.notice = "Clipboard cleared (30s auto-expire)."
+                        }
+                    }
+                }
+                state.noticeIsError = true
+                state.notice = "Plaintext \(key.name) copied — do not paste it into AI chats. Clipboard clears in 30s."
             } catch {
                 state.noticeIsError = true
                 state.notice = error.localizedDescription

@@ -225,3 +225,28 @@ GUI 通过真实 Chrome（playwright-core）做了端到端验证：首启初始
 - **验证**：`apikey-vault-selftest` 全链路 SELFTEST OK（init→CRUD→改密→锁定→旧密码
   拒绝→删除→导出/导入往返）；`script/build_and_run.sh --verify` 确认 .app 启动并
   自动拉起后端（健康检查 OK）。
+
+
+---
+
+## 11. v0.4 更新：Key Guard 防泄露
+
+核心目标：**防止用户把明文 API 密钥输入进 AI 对话框**。三层防护：
+
+1. **界面层**：Web GUI 与原生 App 的 Copy 默认复制安全占位符 `{{NAME}}`；
+   明文复制需确认并警告；原生 App 明文复制 30 秒自动清空剪贴板；Reveal 显示明文时
+   出现橙色警示。
+2. **浏览器扩展**（`extension/`，Chrome/Edge MV3）：内容脚本在任意输入框拦截
+   常见密钥格式——粘贴即拦截替换为 `{{REDACTED}}`、输入即脱敏；可选启用 vault
+   集成后，匹配本地 vault 的密钥替换为 `{{vault:NAME}}`（通过 background worker
+   走扩展源请求，规避页面 CORS）。
+3. **Agent 规范**：AGENTS.md 约定 Agent 用 `apivault get` / 占位符取密钥。
+
+验证：
+
+- `node tests/test_patterns.js`：11/11 模式用例通过（OpenAI/Anthropic/GitHub/Google/
+  Slack/AWS/Stripe/JWT 等）。
+- Playwright + Chrome for Testing 端到端：粘贴 `OPENAI_API_KEY=sk-...` →
+  `OPENAI_API_KEY={{REDACTED}}` + 警告 toast；键入 `ghp_...` → 实时脱敏；
+  启用 vault 集成后匹配密钥 → `{{vault:RESOLVE_ME}}`，未知密钥 → `{{REDACTED}}`。
+- 原生 App（SwiftUI）编译通过，复制逻辑与 30s 剪贴板自动清空已实现。
