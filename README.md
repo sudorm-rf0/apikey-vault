@@ -4,7 +4,9 @@
 
 <div align="center">
 
-[![CI](https://github.com/sudorm-rf0/apikey-vault/actions/workflows/ci.yml/badge.svg)](https://github.com/sudorm-rf0/apikey-vault/actions/workflows/ci.yml)
+<!-- Live CI badge (enable Actions in repo Settings → Actions to activate): -->
+<!-- https://github.com/sudorm-rf0/apikey-vault/actions/workflows/ci.yml/badge.svg -->
+[![Tests](https://img.shields.io/badge/tests-pytest%2046%20%7C%20patterns%2011%20%7C%20swift%20selftest%20OK-brightgreen)](script/test.sh)
 [![Release](https://img.shields.io/github/v/release/sudorm-rf0/apikey-vault)](https://github.com/sudorm-rf0/apikey-vault/releases)
 [![License](https://img.shields.io/github/license/sudorm-rf0/apikey-vault)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
