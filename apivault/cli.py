@@ -306,7 +306,7 @@ def _new_password(args: argparse.Namespace) -> str:
     """Resolve the NEW password for change-password (independent of the old one)."""
     if args.new_password_file:
         try:
-            value = Path(args.new_password_file).expanduser().read_text(encoding="utf-8").strip()
+            value = Path(args.new_password_file).expanduser().read_text(encoding="utf-8").rstrip("\r\n")
         except OSError as exc:
             raise PasswordError(f"cannot read new-password file: {exc}") from exc
         if not value:

@@ -137,3 +137,25 @@ def test_import_rejects_garbage(tmp_path):
     r = run(["import", str(out_file), "--yes"], tmp_path)
     assert r.returncode == 1
     assert "not a valid" in r.stderr
+
+
+def test_password_file_preserves_spaces(tmp_path):
+    pw_file = tmp_path / "password.txt"
+    pw_file.write_text("  master-pw  \n", encoding="utf-8")
+    r = run(["init", "--password-file", str(pw_file)], tmp_path, password="unused")
+    assert r.returncode == 0, r.stderr
+    r = run(["store", "K", "--value", "v1", "--password-file", str(pw_file)], tmp_path, password="unused")
+    assert r.returncode == 0, r.stderr
+    assert run(["get", "K"], tmp_path, password="  master-pw  ").stdout.strip() == "v1"
+    assert run(["get", "K"], tmp_path, password="master-pw").returncode == 1
+
+
+def test_new_password_file_preserves_spaces(tmp_path):
+    new_pw_file = tmp_path / "new-password.txt"
+    new_pw_file.write_text("  new-pw  \r\n", encoding="utf-8")
+    assert run(["init"], tmp_path).returncode == 0
+    r = run(["change-password", "--new-password-file", str(new_pw_file)], tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert run(["status"], tmp_path).returncode == 0
+    assert run(["list"], tmp_path, password="  new-pw  ").returncode == 0
+    assert run(["list"], tmp_path, password="new-pw").returncode == 1

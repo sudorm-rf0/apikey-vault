@@ -33,7 +33,7 @@ def read_password(
     if password_file:
         path = Path(password_file).expanduser()
         try:
-            value = path.read_text(encoding="utf-8").strip()
+            value = path.read_text(encoding="utf-8").rstrip("\r\n")
         except OSError as exc:
             raise PasswordError(f"cannot read password file {path}: {exc}") from exc
         if not value:
