@@ -1,6 +1,6 @@
 # 🔐 apikey-vault
 
-> A local, encrypted API-key vault for AI agents (Codex / Claude) and multi-device use — **keeps plaintext keys out of AI chat boxes**.
+> Local, encrypted API-key management for AI agents and developers — CLI, browser UI, macOS app, and local HTTP API. Keep secrets out of prompts and repositories by retrieving them only when needed.
 
 <div align="center">
 
@@ -12,9 +12,7 @@
 
 <img src="docs/banner.png" alt="apikey-vault" width="640">
 
-<!-- Live CI badge (enable Actions in repo Settings → Actions to activate): -->
-<!-- https://github.com/sudorm-rf0/apikey-vault/actions/workflows/ci.yml/badge.svg -->
-[![Tests](https://img.shields.io/badge/tests-pytest%2046%20%7C%20patterns%2011%20%7C%20swift%20selftest%20OK-brightgreen)](script/test.sh)
+[![CI](https://github.com/sudorm-rf0/apikey-vault/actions/workflows/ci.yml/badge.svg)](https://github.com/sudorm-rf0/apikey-vault/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/sudorm-rf0/apikey-vault)](https://github.com/sudorm-rf0/apikey-vault/releases)
 [![License](https://img.shields.io/github/license/sudorm-rf0/apikey-vault)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
@@ -35,6 +33,28 @@ the CLI or a local HTTP API.
 - **Git multi-device sync**: sync the encrypted vault across devices via a private repo
 
 > 30-second try: `./scripts/demo.sh` (creates a throwaway vault; never touches your real data)
+
+## Try it safely in a disposable vault
+
+**No real API key is needed.** The demo uses example values and a temporary vault, not your existing `~/.apikey-vault` data.
+
+```bash
+git clone https://github.com/sudorm-rf0/apikey-vault.git
+cd apikey-vault
+python3 -m pip install -e .
+# Optional: Node.js is needed by the demo's Key Guard pattern checks.
+./scripts/demo.sh
+```
+
+Requires Python 3.10+ and the `cryptography` dependency. The final demo step also needs Node.js. To start the local web UI after installation:
+
+```bash
+apivault serve --open  # localhost only by default
+```
+
+> **Security boundary:** Encryption at rest does not prevent a privileged local process or an agent that executes `apivault get` from seeing a secret. Never paste real tokens into prompts or logs. See [agent handling guidance](docs/AGENT_SECRET_HANDLING.md) and [security policy](SECURITY.md).
+
+**Explore:** [Screenshots](#-screenshots) · [CLI usage](#-quick-start-cli) · [HTTP API](docs/API.md) · [中文说明](README.zh-CN.md) · [Issues](https://github.com/sudorm-rf0/apikey-vault/issues)
 
 ## ✨ Features
 
