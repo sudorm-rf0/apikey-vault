@@ -4,6 +4,19 @@
 # Key Guard pattern tests. Nothing is written to your real vault.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# The final step runs the Key Guard pattern tests with Node.js. Check for it
+# up front so a missing runtime fails fast with an actionable message instead
+# of a late `node: command not found`.
+if ! command -v node >/dev/null 2>&1; then
+  echo "✗ Node.js is required for the demo's Key Guard pattern checks," >&2
+  echo "  but no 'node' executable was found on your PATH." >&2
+  echo "  Install Node.js from https://nodejs.org (macOS: 'brew install node'), then rerun:" >&2
+  echo "    ./scripts/demo.sh" >&2
+  echo "  No demo vault was created." >&2
+  exit 1
+fi
+
 VD="$(mktemp -d /tmp/apivault-demo.XXXXXX)"
 export APIVAULT_PASSWORD='demo-password'
 
