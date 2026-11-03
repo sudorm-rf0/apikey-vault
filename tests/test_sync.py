@@ -23,10 +23,31 @@ def run(args, tmp_path, password=None, env_extra=None, stdin=None):
     )
 
 
+@pytest.fixture(autouse=True)
+def git_identity(monkeypatch):
+    """Give the temp-repo commits a deterministic identity.
+
+    CI runners have no global git identity, which makes ``git commit`` fail
+    with "Author identity unknown". The sync code inherits the environment,
+    so these variables reach both the CLI subprocesses and the in-process
+    server test without touching the user's git config.
+    """
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "API Vault Tests")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "tests@example.invalid")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "API Vault Tests")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "tests@example.invalid")
+
+
 @pytest.fixture()
 def bare_repo(tmp_path):
     repo = tmp_path / "repo.git"
     subprocess.run(["git", "init", "-q", "--bare", str(repo)], check=True)
+    # Sync uses ``main`` as the remote branch; pin the bare repo's default
+    # branch instead of relying on the host's init.defaultBranch setting.
+    subprocess.run(
+        ["git", "--git-dir", str(repo), "symbolic-ref", "HEAD", "refs/heads/main"],
+        check=True,
+    )
     return str(repo)
 
 
