@@ -24,7 +24,13 @@ def run(args, tmp_path, password=None, env_extra=None, stdin=None):
 
 
 @pytest.fixture()
-def bare_repo(tmp_path):
+def bare_repo(tmp_path, monkeypatch):
+    # Git sync tests must not depend on the runner's global Git identity.
+    # These values are used only for disposable test repositories.
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "Vault Sync Test")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "vault-sync-test@example.invalid")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "Vault Sync Test")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "vault-sync-test@example.invalid")
     repo = tmp_path / "repo.git"
     subprocess.run(["git", "init", "-q", "--bare", str(repo)], check=True)
     return str(repo)
