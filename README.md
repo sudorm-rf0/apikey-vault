@@ -281,6 +281,32 @@ Edge Add-ons).
 See [AGENTS.md](AGENTS.md): agents fetch keys via `apivault get <name>` or the
 `{{vault:NAME}}` placeholder — they never ask you to paste plaintext.
 
+### 4. MCP credential consumer inventory (read-only)
+
+Before rotating a credential used by MCP servers, identify the configs that
+consume it:
+
+```bash
+apivault inventory \
+  --config ~/.config/mcp-audit \
+  --mapping ~/.config/mcp-audit/credentials.json
+```
+
+The mapping is a JSON object such as
+`{"GITHUB_TOKEN": "github-personal", "DOCS_TOKEN": "docs-readonly"}`. It names
+credentials; values stay in the vault. The command reads only explicit `.json`
+(Claude Code-style `mcpServers`) and `.toml` (Codex `mcp_servers`) files directly
+inside `--config`. It reports known references plus `unknown` entries for literal
+values, unsupported shapes, and missing mappings. It never emits or persists
+credential values, imports the vault, accesses the network, or runs a configured
+command (the parser does necessarily read the explicit config files).
+
+Exit code `2` means invalid or unsafe input. Symbolic links inside `--config` are
+rejected, and restart behavior is reported as `unknown`: verify restart/reconnect
+behavior for the exact client version before revoking an old credential. Paths and credential names may themselves be sensitive;
+review output before sharing. This is an inventory aid, not an isolation boundary:
+same-user processes and MCP servers still receive the credentials they need.
+
 ## 🔒 Security model
 
 - **Threat**: vault file copied, disk lost → nothing can be recovered without the master password.
@@ -301,8 +327,9 @@ node tests/test_patterns.js
 
 Covers crypto round-trips/tampering, storage CRUD/change-password/export-import
 (incl. import auto-backup), CLI end-to-end, full HTTP API (auth, rate limits,
-static GUI, first-run init), Key Guard key patterns, and the Swift client ↔
-real backend round trip.
+static GUI, first-run init), Key Guard key patterns, synthetic read-only MCP
+inventory fixtures (including sentinel non-disclosure and symlink rejection),
+and the Swift client ↔ real backend round trip.
 
 ## 📚 FAQ
 

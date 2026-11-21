@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- **Read-only MCP credential inventory**: `apivault inventory --config DIR --mapping FILE`
+  identifies Claude Code-style JSON and Codex TOML consumers of named credentials.
+  It reports unknown/literal entries, never emits or persists credential values,
+  does not import the vault, has no network/subprocess side effects, and rejects
+  symbolic links inside the explicit config root.
+
 ## 0.6.0 (2026-08-21)
 
 ### Features

@@ -156,13 +156,35 @@ KEY=$(apivault get OPENAI_API_KEY)   # Agent 在 shell 中捕获，密钥不进�
 export OPENAI_API_KEY="$KEY"
 ```
 
-### 方式二：一次性加载全部密钥到环境
+### 方式二：MCP 凭据消费清单（只读）
+
+轮换 MCP 使用的凭据前，先确认哪些客户端配置在消费它：
+
+```bash
+apivault inventory \
+  --config ~/.config/mcp-audit \
+  --mapping ~/.config/mcp-audit/credentials.json
+```
+
+映射文件只描述凭据名称，不包含值，例如
+`{"GITHUB_TOKEN": "github-personal", "DOCS_TOKEN": "docs-readonly"}`。命令只读取
+`--config` 目录第一层的显式 `.json`（Claude Code 风格 `mcpServers`）和 `.toml`
+（Codex `mcp_servers`）文件；输出已识别引用，并将字面值、不支持的结构和映射缺失
+标为 `unknown`。它不会输出或持久化凭据值、打开 vault、联网或执行配置中的命令
+（解析器会读取显式指定的配置文件本身）。
+
+退出码 `2` 表示输入无效或不安全；`--config` 内的符号链接会被拒绝。重启行为统一
+标为 `unknown`：撤销旧凭据前，请按具体客户端版本确认重启或重连方式。
+路径和凭据名称本身可能敏感，分享输出前请自行检查。此功能只用于盘点，不构成
+进程隔离：同一用户下的进程和 MCP 服务仍能获得其所需凭据。
+
+### 方式三：一次性加载全部密钥到环境
 
 ```bash
 eval "$(apivault export-env)"
 ```
 
-### 方式三：本地 HTTP API（推荐给长期运行的 Agent 服务）
+### 方式四：本地 HTTP API（推荐给长期运行的 Agent 服务）
 
 ```bash
 # 终端 1：启动服务（自动解锁需提供密码；也可先锁定，稍后 /v1/unlock）
@@ -271,7 +293,7 @@ node tests/test_patterns.js
 
 覆盖密码学往返/篡改、存储 CRUD/改密/导出导入（含导入自动备份）、CLI 端到端、
 HTTP API 全链路（含鉴权、限速、静态 GUI、首启初始化）、Key Guard 密钥模式、
-Swift 客户端↔真实后端往返。
+合成 MCP 清单 fixture（含哨兵不泄露、符号链接拒绝）、Swift 客户端↔真实后端往返。
 
 ## 📚 常见问题（FAQ）
 

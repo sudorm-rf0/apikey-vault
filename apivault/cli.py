@@ -23,6 +23,7 @@ from pathlib import Path
 
 from apivault import __version__
 from apivault import sync as vault_sync
+from apivault.inventory import InventoryError, build_inventory, render_report
 from apivault.passwords import PasswordError, read_password
 from apivault.server import DEFAULT_TTL_SECONDS, serve
 from apivault.store import (
@@ -122,6 +123,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("file", help="input file path")
     p.add_argument("--yes", action="store_true", help="skip confirmation")
     _add_password_opts(p)
+
+    p = sub.add_parser(
+        "inventory",
+        help="read-only MCP credential consumer inventory (explicit paths only)",
+    )
+    p.add_argument("--config", required=True, metavar="DIR",
+                   help="directory containing explicit .json/.toml MCP configs")
+    p.add_argument("--mapping", required=True, metavar="FILE",
+                   help="JSON credential-name-to-label mapping")
+    p.add_argument("--json", action="store_true", help="JSON output")
 
     return parser
 
@@ -513,6 +524,16 @@ def _cmd_import(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_inventory(args: argparse.Namespace) -> int:
+    try:
+        report = build_inventory(Path(args.config), Path(args.mapping))
+    except InventoryError as exc:
+        _eprint(f"error: {exc}")
+        return 2
+    print(render_report(report, as_json=args.json), end="")
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     store = VaultStore(args.dir)
     if not store.initialized:
@@ -559,6 +580,7 @@ COMMANDS = {
     "export": _cmd_export,
     "import": _cmd_import,
     "serve": _cmd_serve,
+    "inventory": _cmd_inventory,
 }
 
 
