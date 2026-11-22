@@ -22,6 +22,9 @@ from typing import Any
 SUPPORTED_SUFFIXES = {".json", ".toml"}
 UNSUPPORTED_CONFIG_SUFFIXES = {".jsonc", ".json5", ".yaml", ".yml"}
 MAX_INPUT_BYTES = 1024 * 1024
+# JSON has no nesting limit in the specification. Enforce one independent of
+# the interpreter's recursion limit before either stdlib parser builds objects.
+MAX_NESTING_DEPTH = 64
 CREDENTIAL_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _AUTH_PREFIX = r"(?:(?:Bearer|Basic|Token)\s+)?"
 _ENV_EXPANSION = r"\$\{(?P<env>[A-Za-z_][A-Za-z0-9_]*)(?:(?::?-)(?P<default>[^}]*))?\}"
@@ -106,6 +109,33 @@ def _safe_relative(path: Path, root: Path) -> str:
         raise InventoryError("config file resolves outside config directory") from exc
 
 
+def _check_nesting(text: str, kind: str) -> None:
+    depth = 0
+    in_string = False
+    escaped = False
+    for char in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "{[(":
+            depth += 1
+            if depth > MAX_NESTING_DEPTH:
+                raise InventoryError(
+                    f"{kind} exceeds the supported nesting depth of {MAX_NESTING_DEPTH}"
+                )
+        elif char in "}])":
+            depth -= 1
+    if in_string or depth:
+        raise InventoryError(f"cannot parse {kind} as a supported configuration")
+
+
 def _read_text(path: Path, kind: str) -> str:
     try:
         with path.open("rb") as handle:
@@ -121,8 +151,10 @@ def _read_text(path: Path, kind: str) -> str:
 
 
 def _load_mapping(path: Path) -> dict[str, str]:
+    text = _read_text(path, "mapping")
+    _check_nesting(text, "mapping")
     try:
-        raw = json.loads(_read_text(path, "mapping"))
+        raw = json.loads(text)
     except (json.JSONDecodeError, RecursionError) as exc:
         raise InventoryError("cannot read mapping file as JSON") from exc
     if not isinstance(raw, dict):
@@ -468,6 +500,7 @@ def _scan_claude_server(
 
 def _load_document(path: Path) -> tuple[str, Any]:
     text = _read_text(path, "JSON config" if path.suffix == ".json" else "TOML config")
+    _check_nesting(text, "JSON config" if path.suffix == ".json" else "TOML config")
     if path.suffix == ".json":
         try:
             return "claude-code", json.loads(text)

@@ -442,7 +442,7 @@ def test_inventory_rejects_deep_json_without_traceback(tmp_path):
     r = inventory_run(config_dir, mapping, tmp_path)
 
     assert r.returncode == 2
-    assert "cannot parse JSON config" in r.stderr
+    assert "nesting depth" in r.stderr
     assert "Traceback" not in r.stderr
 
 
@@ -458,7 +458,7 @@ def test_inventory_rejects_deep_toml_without_traceback(tmp_path):
     r = inventory_run(config_dir, mapping, tmp_path)
 
     assert r.returncode == 2
-    assert "cannot parse TOML config" in r.stderr
+    assert "nesting depth" in r.stderr
     assert "Traceback" not in r.stderr
 
 
@@ -471,5 +471,5 @@ def test_inventory_rejects_deep_mapping_without_traceback(tmp_path):
     r = inventory_run(config_dir, mapping, tmp_path)
 
     assert r.returncode == 2
-    assert "cannot read mapping file as JSON" in r.stderr
+    assert "nesting depth" in r.stderr
     assert "Traceback" not in r.stderr
