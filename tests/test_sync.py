@@ -23,10 +23,24 @@ def run(args, tmp_path, password=None, env_extra=None, stdin=None):
     )
 
 
+@pytest.fixture(autouse=True)
+def test_git_identity(monkeypatch):
+    """Keep disposable sync repositories independent of runner configuration."""
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "API Vault Tests")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "tests@example.invalid")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "API Vault Tests")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "tests@example.invalid")
+
+
 @pytest.fixture()
 def bare_repo(tmp_path):
     repo = tmp_path / "repo.git"
     subprocess.run(["git", "init", "-q", "--bare", str(repo)], check=True)
+    # Sync reads origin/main; pin it instead of relying on the runner's init.defaultBranch.
+    subprocess.run(
+        ["git", "--git-dir", str(repo), "symbolic-ref", "HEAD", "refs/heads/main"],
+        check=True,
+    )
     return str(repo)
 
 
