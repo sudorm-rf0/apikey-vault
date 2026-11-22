@@ -431,3 +431,45 @@ def test_inventory_reports_missing_mapping_entry_without_echoing_value(tmp_path)
     assert report["summary"]["unknown"] == 1
     assert "literal env MISSING_TOKEN" in report["unknown"][0]["reason"]
     assert sentinel not in r.stdout + r.stderr
+
+
+def test_inventory_rejects_deep_json_without_traceback(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "deep.json").write_text("[" * 1000 + "]" * 1000, encoding="utf-8")
+    mapping = write_mapping(tmp_path / "mapping.json", {})
+
+    r = inventory_run(config_dir, mapping, tmp_path)
+
+    assert r.returncode == 2
+    assert "cannot parse JSON config" in r.stderr
+    assert "Traceback" not in r.stderr
+
+
+def test_inventory_rejects_deep_toml_without_traceback(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "deep.toml").write_text(
+        "x = " + "[" * 1000 + "]" * 1000,
+        encoding="utf-8",
+    )
+    mapping = write_mapping(tmp_path / "mapping.json", {})
+
+    r = inventory_run(config_dir, mapping, tmp_path)
+
+    assert r.returncode == 2
+    assert "cannot parse TOML config" in r.stderr
+    assert "Traceback" not in r.stderr
+
+
+def test_inventory_rejects_deep_mapping_without_traceback(tmp_path):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    mapping = tmp_path / "mapping.json"
+    mapping.write_text("[" * 1000 + "]" * 1000, encoding="utf-8")
+
+    r = inventory_run(config_dir, mapping, tmp_path)
+
+    assert r.returncode == 2
+    assert "cannot read mapping file as JSON" in r.stderr
+    assert "Traceback" not in r.stderr

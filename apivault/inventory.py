@@ -123,7 +123,7 @@ def _read_text(path: Path, kind: str) -> str:
 def _load_mapping(path: Path) -> dict[str, str]:
     try:
         raw = json.loads(_read_text(path, "mapping"))
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, RecursionError) as exc:
         raise InventoryError("cannot read mapping file as JSON") from exc
     if not isinstance(raw, dict):
         raise InventoryError("mapping must be a JSON object of credential names to labels")
@@ -471,12 +471,12 @@ def _load_document(path: Path) -> tuple[str, Any]:
     if path.suffix == ".json":
         try:
             return "claude-code", json.loads(text)
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, RecursionError) as exc:
             raise InventoryError("cannot parse JSON config as a supported Claude MCP config") from exc
     if path.suffix == ".toml":
         try:
             return "codex", tomllib.loads(text)
-        except tomllib.TOMLDecodeError as exc:
+        except (tomllib.TOMLDecodeError, RecursionError) as exc:
             raise InventoryError("cannot parse TOML config as a supported Codex MCP config") from exc
     raise InventoryError("only explicit .json and .toml config files are supported")
 
